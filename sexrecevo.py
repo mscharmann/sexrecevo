@@ -2,27 +2,6 @@
 """
 - a population of diploids, size can change but is capped at NMAX by random culling (carrying capacity) => better implementation of K: a probability of survival that is antiproportional to the number of indiv => fluctuation around NMAX should result.
 - generations are non-overlapping, asexual reproduction is not considered, pre-reproductive mortality is zero
-- no spatial structure / mates are drawn at random (but respecting ovule - sperm pairing)
-	spatial structure implementation: X and Y coordinates as additional traits of individuals!! reflecting boundaries of grid, or "circular". Dispersal drawing two distances from dispersal kernel distribution.
-- there is no selfing -- outcrossing is already mandatory and hence not subject to evolution (leaving only sexual conflict and random drift as evolutionary factors)
-- each individual is granted the same glucose budget upon birth
-- budget can be spent on ovules, sperm, or both
-- ovules and sperm have fixed costs (e.g. one ovule == 2 sperm)
-- zygote development until birth (gestation) incurs a cost to mothers (maternal care / provisioning): fixed XY glucose per zygote => if a mother has more ovules fertilised than can be reared given its glucose budget reamining after gamete production, the excess zygotes will be randomly culled (aborted) . This should mean that mothers (irrespective of the % of ovules/sperm they made) are penalised for making too many gametes and leaving too few resources for gestation.
-- allocation to ovule number and sperm number are principally independent, quantitative traits, each controlled by X bi-allelic loci with pure additivity 
-- individual allocation to ovules and sperm may evolve.
-
-- we observe / record: histogram of "% resources invested into sperm production"
-	(bimodal at 0,1 : dioecy ; bimodal at c. 0,intermediate : gynodioecy ; bimodal at c. intermediate,1 : androdioecy, unimodal: only hermaphrodites. Also interesting: width of the distribution/variance is sex allocation in pop!!)
-	total resources = start budget = sperm + ovules + postzygotic care
-	
-
-
-
-principal steps of each cycle:
-- cap the population size
-- calculate individual traits from genotypes: N_ovules, N_sperm, N_gestation
-- 
 """
 
 """
@@ -758,7 +737,7 @@ def mutate_gametes_SNPs (ingametes, grid_xlen, grid_ylen, mu):
 	
 ######################
 
-########
+######## MAIN
 
 #inseqs = read_phylip("start.aln")
 
@@ -769,13 +748,13 @@ def mutate_gametes_SNPs (ingametes, grid_xlen, grid_ylen, mu):
 # OK works! next: inversions and/or larger insertions (TEs!)
 # see "Inversions are bigger on the X chromosome" Cheng & Kirkpatrick
 
-
+## specifiy the landscape that pop lives in; simples case a single grid cell => no spatial structure.
 gridlength_x = 1
 gridlength_y = 1
 N_per_cell = 20
-exponential_decay_shape_param = 2.0
+exponential_decay_shape_param = 2.0 # for dispersal kernels
 
-
+## specifiy the initial position of the sex determining site; a single SNP.
 sexdet_site = 1000 ## males = AT, females = TT ; other genotypes are neuters = no gametes! 
 
 # 2 events on a 10 Mb chromosome = 2e-7 per site
@@ -785,9 +764,10 @@ sliding_window_size = 100
 # SNP mutation rate
 mu_snps = 2.5e-7
 
-# indel mutation rate
+# indel mutation rate: not yet implemented
 mu_indel = 0.15*mu_snps
 
+# not yet implemented: TE insertions and inversions
 # TE indel rates: see here:
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5447328/
 TE_insertion_rate = "2.11*10^-9"
@@ -798,16 +778,17 @@ TE_seq = ''.join(random.choice(dna) for i in range(TE_length))
 print TE_seq
 
 
-#pop = make_pop(10000, gridlength_x, gridlength_y,20,0.3,resource_budget,0)
+### create starting population: either from imported sequences, or generate a single random sequence and clone it to the pops size.
+
 #pop = make_dioecious_pop_imported_startseqs (N_per_cell, gridlength_x , gridlength_y, with_indels.values(), sexdet_site) # OK
 
 pop = make_dioecious_pop_single_random_startseq (N_per_cell, gridlength_x , gridlength_y, 10000, sexdet_site)
 
-
+# main loop
 for generation in range(100000):
 #	measure_chrom_lengths (pop, gridlength_x, gridlength_y)
 	pop = enforce_carrying_capacity (pop, gridlength_x, gridlength_y, 40.0) # carrying capacity must be a float!
-	if (float(generation)/100).is_integer():
+	if (float(generation)/100).is_integer(): # every x generations calculate LD and export a sample of the population to a phylip file
 		window_LD (pop, gridlength_x, gridlength_y, sexdet_site, 20, 1000, 200)
 		pop_to_phylip (pop, gridlength_x, gridlength_y, sexdet_site, 10, 10, "start_XY_ident.Ne40.generation_"+ str(generation) +".aln")
 	n_total = measure_grid_density (pop, gridlength_x, gridlength_y)
@@ -825,19 +806,6 @@ for generation in range(100000):
 pop_to_phylip (pop, gridlength_x, gridlength_y, sexdet_site, 10, 10, "start_XY_ident.Ne40.generation_"+ str(generation) +".aln")
 
 
-
-
-	
-#	# find bi-allelic SNPs and calculate their freq
-#	SNP_pos = []
-#	SNP_freqs = []
-#	for idx in range(len(inseqs.values()[0])):
-#		col = [x[idx] for x in inseqs.values()]
-#		if len(set(col)) > 1:
-#			is_indel = numpy.random.choice([True,False],p=[indel_rate,1.0-indel_rate])
-#			if is_indel:
-#				indel_pos.append(idx)
-#				SNP_alleles_to_become_indel.append( numpy.random.choice(list(set(col)))) 
 
 
 
