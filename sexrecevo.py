@@ -573,8 +573,8 @@ def window_LD (inpop, grid_xlen, grid_ylen, sexdet_site, sample_size, window_len
 		for y in range(grid_ylen):
 			all_indivs += inpop[x][y]
 	
-	males = [i for i in all_indivs if i[1][sexdet_site] == "T" or i[2][sexdet_site] == "T"]
-	females = [i for i in all_indivs if i[1][sexdet_site] == "A"]
+	males = [i for i in all_indivs if i[1][sexdet_site] == "A" or i[2][sexdet_site] == "A"]
+	females = [i for i in all_indivs if i[1][sexdet_site]+i[2][sexdet_site] == "TT"]
 	msamples = numpy.random.choice(range(len(males)), size=sample_size*0.5)
 
 	msamples = [[males[x][1],males[x][2]] for x in msamples]
@@ -588,18 +588,50 @@ def window_LD (inpop, grid_xlen, grid_ylen, sexdet_site, sample_size, window_len
 	# find bi-allelic SNPs and calculate their freqs
 	SNP_pos = []
 	SNP_freqs = []
+	SNP_freqs_males = []
+	SNP_freqs_females = []
+	Fst_list = []
+	mf_freqdiffs = []
 	for idx in range(len(samples_flat[0])):
 		allconcat = "".join([x[idx] for x in samples_flat])
 		alleles = sorted(list(set(allconcat)))
+		mconcat = "".join([x[0][idx]+x[1][idx] for x in msamples])
+		fconcat = "".join([x[0][idx]+x[1][idx] for x in fsamples])
 		if not "-" in alleles:
 			if len(alleles) == 2:
 				SNP_pos.append( idx )
-				f = allconcat.count(alleles[0]) / n_chroms_sampled 
-				if f > 0.5:
-					maf = 1.0-f
+				freq_global = allconcat.count(alleles[0]) / n_chroms_sampled 
+				if freq_global > 0.5:
+					maf = 1.0-freq_global
 				else:
-					maf = f
+					maf = freq_global
 				SNP_freqs.append(maf)
+				freq_m = mconcat.count(alleles[0]) / (n_chroms_sampled*0.5)
+				freq_f = fconcat.count(alleles[0]) / (n_chroms_sampled*0.5)
+				SNP_freqs_males.append( freq_m )
+				SNP_freqs_females.append( freq_f )
+				pi_overall = freq_global * (1-freq_global)
+				pi_m = freq_m * (1-freq_m)
+				pi_f = freq_f * (1-freq_f)
+				avg_pi_within = (pi_m + pi_f) / 2.0
+				Fst = ( pi_overall - avg_pi_within ) / pi_overall 
+				mf_freqdiffs.append( freq_m - freq_f )
+				Fst_list.append(Fst)
+	#	
+
+	# Fst in sliding windows
+	left_idx = 0
+	right_idx = left_idx+window_length
+	window_Fsts = []
+	while right_idx < len( samples_flat[0]) :
+		SNPs_in_window = [x for x in SNP_pos if x >= left_idx and x < right_idx]
+#		print SNPs_in_window
+		left_idx += step_size
+		right_idx += step_size
+		mean_Fst = numpy.mean([ Fst_list[SNP_pos.index(x)] for x in SNPs_in_window ])
+		window_Fsts.append( mean_Fst )
+	with open("window_Fsts.txt", "a") as F:
+		F.write("\t".join([str(x) for x in window_Fsts]) + "\n")
 	
 	# pairs of SNPs in sliding windows
 	left_idx = 0
@@ -652,9 +684,12 @@ def window_LD (inpop, grid_xlen, grid_ylen, sexdet_site, sample_size, window_len
 						
 	#		print pa, pb, pab, r2
 			LD_list.append( r2/r2_max )
+	#		LD_list.append( r2 )
 	#		print r2/r2_max, pa, pb, pab, r2, r2_max
 		window_LD_per_site.append(numpy.mean( LD_list))	
-	print window_LD_per_site[:10], window_LD_per_site[20:25]
+	#print window_LD_per_site[:10], window_LD_per_site[20:25]
+	
+	
 			
 			
 #						pairwise_identity_per_site_window_avg = []
@@ -739,9 +774,9 @@ def mutate_gametes_SNPs (ingametes, grid_xlen, grid_ylen, mu):
 
 ######## MAIN
 
-#inseqs = read_phylip("start.aln")
+inseqs = read_phylip("start.aln")
 
-#with_indels = replace_SNPs_with_indels (inseqs, 0.15, 1)
+with_indels = replace_SNPs_with_indels (inseqs, 0.15, 1)
 
 #write_phylip (with_indels, "start_with_indels.aln")
 
@@ -751,18 +786,18 @@ def mutate_gametes_SNPs (ingametes, grid_xlen, grid_ylen, mu):
 ## specifiy the landscape that pop lives in; simples case a single grid cell => no spatial structure.
 gridlength_x = 1
 gridlength_y = 1
-N_per_cell = 20
+N_per_cell = 40
 exponential_decay_shape_param = 2.0 # for dispersal kernels
 
 ## specifiy the initial position of the sex determining site; a single SNP.
 sexdet_site = 1000 ## males = AT, females = TT ; other genotypes are neuters = no gametes! 
 
 # 2 events on a 10 Mb chromosome = 2e-7 per site
-nominal_overall_rec_rate_per_site = 1e-6 # can be at most 1 event; => max(nominal_overall_rec_rate_per_site) = 1/sequence_length
+nominal_overall_rec_rate_per_site = 2e-6 # can be at most 1 event; => max(nominal_overall_rec_rate_per_site) = 1/sequence_length
 sliding_window_size = 100
 
 # SNP mutation rate
-mu_snps = 2.5e-7
+mu_snps = 2.5e-5
 
 # indel mutation rate: not yet implemented
 mu_indel = 0.15*mu_snps
@@ -782,14 +817,14 @@ print TE_seq
 
 #pop = make_dioecious_pop_imported_startseqs (N_per_cell, gridlength_x , gridlength_y, with_indels.values(), sexdet_site) # OK
 
-pop = make_dioecious_pop_single_random_startseq (N_per_cell, gridlength_x , gridlength_y, 10000, sexdet_site)
+pop = make_dioecious_pop_single_random_startseq (N_per_cell, gridlength_x , gridlength_y, 5000, sexdet_site)
 
 # main loop
 for generation in range(100000):
 #	measure_chrom_lengths (pop, gridlength_x, gridlength_y)
 	pop = enforce_carrying_capacity (pop, gridlength_x, gridlength_y, 40.0) # carrying capacity must be a float!
 	if (float(generation)/100).is_integer(): # every x generations calculate LD and export a sample of the population to a phylip file
-		window_LD (pop, gridlength_x, gridlength_y, sexdet_site, 20, 1000, 200)
+		window_LD (pop, gridlength_x, gridlength_y, sexdet_site, 20, 100, 50)
 		pop_to_phylip (pop, gridlength_x, gridlength_y, sexdet_site, 10, 10, "start_XY_ident.Ne40.generation_"+ str(generation) +".aln")
 	n_total = measure_grid_density (pop, gridlength_x, gridlength_y)
 	print generation, n_total
