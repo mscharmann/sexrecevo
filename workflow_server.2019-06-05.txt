@@ -1,0 +1,42 @@
+## local:
+scp sexrecevo.blocrec.baseless.2019-06-05.py mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims_2019-06-05/
+
+
+## VITAL-IT
+cd /scratch/temporary/mscharma/sims_2019-06-05
+
+# run_sim.sh
+
+mkdir sim_${LSB_JOBINDEX}
+cd sim_${LSB_JOBINDEX}
+python ../sexrecevo.blocrec.baseless.2019-06-05.py
+mv logfile_window_dxy.txt run_${LSB_JOBINDEX}.logfile_window_dxy.txt
+mv logfile_window_Fsts.txt run_${LSB_JOBINDEX}.logfile_window_Fsts.txt
+mv logfile_XX_rec_probs.txt run_${LSB_JOBINDEX}.logfile_XX_rec_probs.txt
+mv logfile_XY_rec_probs.txt run_${LSB_JOBINDEX}.logfile_XY_rec_probs.txt
+
+###
+
+bsub -J "sexrec[1-100]" -n 1 -W 1:00 -R "rusage[mem=10000]" -M 100000 <run_sim.sh 
+
+# kill if necessary:
+for i in {1..100} ; do bkill 149564[$i] ; done
+
+# took c. 30 min
+
+## collect results:
+
+mkdir example.100_iterations.2019-06-05
+
+for i in {1..100} ; do
+echo ${i}
+cp sim_${i}/* ./example.100_iterations.2019-06-05/
+done
+
+tar -zcvf example.100_iterations.2019-06-05.tar.gz example.100_iterations.2019-06-05
+
+rm -r example.100_iterations.2019-06-05
+rm -r sim*
+
+## local:
+scp mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims_2019-06-05/example.100_iterations.2019-06-05.tar.gz ./
