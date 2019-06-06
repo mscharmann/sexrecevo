@@ -11,3 +11,6 @@ sexrecevo
 - Dan: to code up plotting modules, use the 100 iterations in "example.100_iterations.2019-06-05.tar.gz"
 Should be self-explanatory. Just one parameter combination that was tweaked to show the desired effect.
 Let me know if anything needs changing!
+
+# 2019-06-06
+-Plotting function done (./Plotting/Logplotter.py). Mathias to run some more sims before we discuss with others. 
