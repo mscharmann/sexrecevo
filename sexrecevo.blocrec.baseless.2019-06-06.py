@@ -15,25 +15,11 @@ ideas to improve algorithm:
 - generations are non-overlapping, asexual reproduction is not considered, pre-reproductive mortality is zero
 - no spatial structure / mates are drawn at random (but respecting ovule - sperm pairing)
 	spatial structure implementation: X and Y coordinates as additional traits of individuals!! reflecting boundaries of grid, or "circular". Dispersal drawing two distances from dispersal kernel distribution.
-- there is no selfing -- outcrossing is already mandatory and hence not subject to evolution (leaving only sexual conflict and random drift as evolutionary factors)
-- each individual is granted the same glucose budget upon birth
-- budget can be spent on ovules, sperm, or both
-- ovules and sperm have fixed costs (e.g. one ovule == 2 sperm)
-- zygote development until birth (gestation) incurs a cost to mothers (maternal care / provisioning): fixed XY glucose per zygote => if a mother has more ovules fertilised than can be reared given its glucose budget reamining after gamete production, the excess zygotes will be randomly culled (aborted) . This should mean that mothers (irrespective of the % of ovules/sperm they made) are penalised for making too many gametes and leaving too few resources for gestation.
-- allocation to ovule number and sperm number are principally independent, quantitative traits, each controlled by X bi-allelic loci with pure additivity 
-- individual allocation to ovules and sperm may evolve.
-
-- we observe / record: histogram of "% resources invested into sperm production"
-	(bimodal at 0,1 : dioecy ; bimodal at c. 0,intermediate : gynodioecy ; bimodal at c. intermediate,1 : androdioecy, unimodal: only hermaphrodites. Also interesting: width of the distribution/variance is sex allocation in pop!!)
-	total resources = start budget = sperm + ovules + postzygotic care
-	
-
 
 
 principal steps of each cycle:
 - cap the population size
-- calculate individual traits from genotypes: N_ovules, N_sperm, N_gestation
-- 
+- . . .
 """
 
 """
@@ -70,19 +56,6 @@ https://www.sciencedirect.com/science/article/pii/S0092867416306675
 
 import numpy, random, os
 
-
-def write_phylip (concat_dict, outfile):
-	
-	with open(outfile, "w") as OUTFILE:
-		ntaxa = len(concat_dict.keys())
-		len_align = len(concat_dict[concat_dict.keys()[0]]) # gets value of first element in dictionary -> this OK since all seqs have same length
-		header = str(ntaxa) + " " + str(len_align) + "\n"
-		OUTFILE.write(header)
-		for sample in sorted(concat_dict.keys()):
-			out_line = sample + "    " + concat_dict[sample] + "\n"
-			OUTFILE.write(out_line)
-	OUTFILE.close()
-	
 
 def make_dioecious_pop (N_per_cell, grid_xlen, grid_ylen, sexdet_site):
 	
@@ -499,46 +472,6 @@ def disperse_pop (inpop, grid_xlen, grid_ylen, scale_parameter):
 					dispersed_pop[int(new_coords[0])][int(new_coords[1])].append(i)
 					cnt += 1
 	return dispersed_pop				
-
-
-
-def measure_chrom_lengths (inpop, grid_xlen, grid_ylen):
-	
-	chrom_lengths = []
-	for x in range(grid_xlen):
-		for y in range(grid_ylen):
-			for i in inpop[x][y]:
-				chrom_lengths.append(len(i[1]))
-				chrom_lengths.append(len(i[2]))
-	print max(chrom_lengths), min(chrom_lengths)
-	
-
-def pop_to_phylip (inpop, grid_xlen, grid_ylen, sample_size_M, sample_size_F, outfilename):
-
-	# random sample
-	all_indivs = []
-	for x in range(grid_xlen):
-		for y in range(grid_ylen):
-			all_indivs += inpop[x][y]
-	
-	males = [i for i in all_indivs if i[1][i[3]] == "A" or i[2][i[4]] == "A"]
-	females = [i for i in all_indivs if i[1][i[3]]+i[2][i[4]] == "TT"]
-
-	msamples = numpy.random.choice(range(len(males)), size=sample_size_M)
-	msamples = [males[x] for x in msamples]
-	fsamples = numpy.random.choice(range(len(females)), size=sample_size_F)
-	fsamples = [females[x] for x in fsamples]
-	
-	samples = msamples+fsamples
-	
-	out_seq_dict = {}
-	cnt = 100
-	for s in samples:
-		cnt += 1
-		out_seq_dict[str(cnt)+"_1"] = s[1]
-		out_seq_dict[str(cnt)+"_2"] = s[2]
-	
-	write_phylip (out_seq_dict, outfilename)
 
 
 
