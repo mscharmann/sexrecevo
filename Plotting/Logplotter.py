@@ -1,3 +1,4 @@
+from __future__ import division
 import sys
 
 def Logplotter(logfile_dir, Stat_to_plot):
@@ -13,14 +14,11 @@ def Logplotter(logfile_dir, Stat_to_plot):
     
     """
     
-    
-    
     import os
     import numpy as np
     from matplotlib import pyplot as plt
     import matplotlib.colors as colors
     import matplotlib.cm as cmx
-    import matplotlib.colorbar as cb
 
 
     ## Get files, generation and window numbers. 
@@ -28,7 +26,7 @@ def Logplotter(logfile_dir, Stat_to_plot):
     logfiles = []
 
     for logfile in os.listdir(logfile_dir):
-        if Stat_to_plot in logfile:
+        if Stat_to_plot in logfile and "pdf" not in logfile:
             logfiles.append("%s/%s" % (logfile_dir, logfile))
 
     ## Get the number of generations
@@ -61,7 +59,7 @@ def Logplotter(logfile_dir, Stat_to_plot):
 
 
     ## Now get data. Could probably do this easier with pandas, but going to hack it just with base python. 
-	
+
     for logfile in logfiles:
         for line in open(logfile, 'r').readlines():
             if not any(["site" in line, "generation" in line]):
@@ -84,23 +82,17 @@ def Logplotter(logfile_dir, Stat_to_plot):
 
     Averaged_data_by_gen = {}
 
-    max_of_all_avgs = 0.0
     for gen in Raw_data_by_gen:
         Averaged_data_by_gen[gen] = {}
         for window in Raw_data_by_gen[gen]:
-            avg = np.average(Raw_data_by_gen[gen][window])
-            Averaged_data_by_gen[gen][window] = avg
-            if avg > max_of_all_avgs:
-            	max_of_all_avgs = avg
+            Averaged_data_by_gen[gen][window] = np.average(Raw_data_by_gen[gen][window])
 
 
 
     ### Now for the plotting  ###
 
     fig = plt.figure(figsize = (20,10))
-    axes = plt.gca()
-    axes.set_ylim([0.0,max_of_all_avgs+0.05*max_of_all_avgs]) # set y-axis limits to always start from zero
-    
+
     ax1 = plt.subplot()
 
     ## make some pretty colours
@@ -110,6 +102,7 @@ def Logplotter(logfile_dir, Stat_to_plot):
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=BuPu)
 
     colour_index = 0
+    plot_max = 0
     for gen in generations: ## use generations list for iteration as its in order. Same for windows below.
         gen_data = []
         for window in windows:  
@@ -120,28 +113,44 @@ def Logplotter(logfile_dir, Stat_to_plot):
         ax1.plot(gen_data, color=colorVal, label = gen ) #, cmap = "BuPu")
 
         colour_index += 1
+        
+        ## track highest value for mannually setting the ylim on plots later. 
+        if max(gen_data) > plot_max:
+            plot_max = max(gen_data)
 
+    ## Plot formatting ## 
+    
+    ax1.set_title(Stat_to_plot)
+    
     ## remove extra axes
     ax1.spines["top"].set_visible(False)
     ax1.spines["right"].set_visible(False)
     ax1.patch.set_visible(False)
-    ax1.set_title(Stat_to_plot)
-    ax1.set_xticks(range(0,len(windows), 5))
-    ax1.set_xticklabels(windows[::5],rotation = 30) 
+    
+    ## sample 50 tick labels for the x axis
+    xtick_sampler = int(np.round(len(windows)/50))
+    ax1.set_xticks(range(0,len(windows), xtick_sampler))
+    ax1.set_xticklabels(windows[::xtick_sampler],rotation = 30) 
+    
+    ## turn off unwanted tickmarks on top and right axes
+    ax1.tick_params(top="off", right="off") 
+    
+    ## set the ylim so all plots start from 0
+    ax1.set_ylim(0,(plot_max+(plot_max/10)))
+    
+    ## add axis labels
     ax1.set_ylabel("%s (averaged over %s iterations)" % (Stat_to_plot, len(logfiles)))
     ax1.set_xlabel("Window")
-    #ax1.set_xticklabels
 
+    ## inset the axis for the colorbar legend and format it
     cb_inset = fig.add_axes([0.65,0.9,0.2,0.05])
     cb_inset.set_title("Generations")
     cb_inset.imshow((generations,generations), cmap=BuPu, extent=[min(generations),max(generations),0,100])
-    #cb_inset.spines["left"].set_visible(False)
-    cb_inset.axes.get_yaxis().set_visible(False)
-    #plt.legend(ncol = 2)
-    
+    cb_inset.axes.get_yaxis().set_visible(False)    
+
+
 
     plt.savefig("%s/%s_summary_plot.pdf" % (logfile_dir, Stat_to_plot))
-    #plt.show()
 
     print "All done! Your plot is here: %s/%s_summary_plot.pdf" % (logfile_dir, Stat_to_plot)
 
