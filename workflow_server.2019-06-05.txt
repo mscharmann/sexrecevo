@@ -17,10 +17,10 @@ mv logfile_XY_rec_probs.txt run_${LSB_JOBINDEX}.logfile_XY_rec_probs.txt
 
 ###
 
-bsub -J "sexrec[1-100]" -n 1 -W 1:00 -R "rusage[mem=10000]" -M 100000 <run_sim.sh 
+bsub -J "sexrec[1-100]" -n 1 -W 8:00 -R "rusage[mem=32000]" -M 48000000 <run_sim.sh 
 
 # kill if necessary:
-for i in {1..100} ; do bkill 149564[$i] ; done
+for i in {1..100} ; do bkill 199897[$i] ; done
 
 # took c. 30 min
 

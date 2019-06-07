@@ -61,7 +61,7 @@ def Logplotter(logfile_dir, Stat_to_plot):
 
 
     ## Now get data. Could probably do this easier with pandas, but going to hack it just with base python. 
-
+	
     for logfile in logfiles:
         for line in open(logfile, 'r').readlines():
             if not any(["site" in line, "generation" in line]):
@@ -84,17 +84,23 @@ def Logplotter(logfile_dir, Stat_to_plot):
 
     Averaged_data_by_gen = {}
 
+    max_of_all_avgs = 0.0
     for gen in Raw_data_by_gen:
         Averaged_data_by_gen[gen] = {}
         for window in Raw_data_by_gen[gen]:
-            Averaged_data_by_gen[gen][window] = np.average(Raw_data_by_gen[gen][window])
+            avg = np.average(Raw_data_by_gen[gen][window])
+            Averaged_data_by_gen[gen][window] = avg
+            if avg > max_of_all_avgs:
+            	max_of_all_avgs = avg
 
 
 
     ### Now for the plotting  ###
 
     fig = plt.figure(figsize = (20,10))
-
+    axes = plt.gca()
+    axes.set_ylim([0.0,max_of_all_avgs+0.05*max_of_all_avgs]) # set y-axis limits to always start from zero
+    
     ax1 = plt.subplot()
 
     ## make some pretty colours
