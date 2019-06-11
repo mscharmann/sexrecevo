@@ -9,7 +9,7 @@ Let me know if anything needs changing!
 - Plotting function done (./Plotting/Logplotter.py). Mathias to run some more sims before we discuss with others. 
 
 
-## PSEUDOCODE of the model
+# PSEUDOCODE of the model
 
 0. 	create population
 	- diploid individuals, each with two homologous chromosomes, each chromosome is an array of 0s and 1s
@@ -20,26 +20,46 @@ Let me know if anything needs changing!
  	- SD-locus itself has no effect on recombination probability
 
 for generation in n_generations:
+
 	1.	enforce carrying capacity of population (random culling)
+	
 	2.	remove fixed variants
+	
 	3.	produce gametes (meiosis)
+	
 		- male individuals produce male gametes, females produce female gametes
+		
 		- 4 gametes per individual (2 meioses per individual)
+		
 		- in each meiosis, up to 1 crossover can take place
+		
 		- if crossover takes place, the location is chosen randomly for each position along the chromosome
+		
 		- the probability to recombine per site is given by a nominal background probability
+		
 		- the local probability is reduced if the chromosomes in the meiosis carry different alleles, i.e. probability is zero for an "area" along the chromosome affected by the variant
+		
 	4.	mutate gametes
+	
 		- variants are thrown randomly onto the gametes
+		
 		- variants reduce the local recombination rate when heterozygous, but have no effect when homozygous
+		
 		- each variant has two properties: location along the chromosome, "area" (number of bases) affected by the reduction in recombination   
+		
 	5.	produce zygotes (mate)
+	
 		- random draws from M + F gamete pools (only M+F are allowed)
 		
 
-# Principal Parameters:
+## Principal Parameters:
+
 N	population size
+
 length of chromosome
+
 mu	mutation rate
+
 rho	nominal background mutation rate
+
 "area" (number of bases) affected by the reduction in recombination (could be a single value, or a distribution)
