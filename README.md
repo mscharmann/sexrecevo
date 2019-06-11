@@ -60,6 +60,6 @@ length of chromosome
 
 mu	mutation rate
 
-rho	nominal background mutation rate
+rho	nominal background recombination rate 
 
 "area" (number of bases) affected by the reduction in recombination (could be a single value, or a distribution)
