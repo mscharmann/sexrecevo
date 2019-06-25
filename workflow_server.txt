@@ -1,0 +1,121 @@
+## local:
+/Users/scharmann/Documents/git_repositories/sexrecevo
+scp sexrecevo.blocrec.baseless.2019-06-19.py mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/
+
+
+## VITAL-IT
+mkdir /scratch/temporary/mscharma/sims/
+cd /scratch/temporary/mscharma/sims/
+
+mkdir collect
+
+# run_sim.sh
+
+mkdir sim_${LSB_JOBINDEX}
+cd sim_${LSB_JOBINDEX}
+python ../sexrecevo.blocrec.baseless.2019-06-19.py
+cp logfile_window_dxy.txt ../collect/run_${LSB_JOBINDEX}.logfile_window_dxy.txt
+cp logfile_window_Fsts.txt ../collect/run_${LSB_JOBINDEX}.logfile_window_Fsts.txt
+cp logfile_XX_rec_probs.txt ../collect/run_${LSB_JOBINDEX}.logfile_XX_rec_probs.txt
+cp logfile_XY_rec_probs.txt ../collect/run_${LSB_JOBINDEX}.logfile_XY_rec_probs.txt
+cp logfile_nonrec_region_size.txt ../collect/run_${LSB_JOBINDEX}.logfile_nonrec_region_size.txt
+
+###
+
+bsub -J "sexrec[1-100]" -n 1 -W 4:00 -R "rusage[mem=32000]" -M 48000000 <run_sim.sh 
+
+# kill if necessary:
+for i in {1..100} ; do bkill 204780[$i] ; done
+
+
+
+## collect results:
+
+mkdir example.100_iterations.2019-06-05
+
+for LSB_JOBINDEX in {1..100} ; do
+cd sim_${LSB_JOBINDEX}
+echo ${LSB_JOBINDEX}
+cp logfile_window_dxy.txt ../collect/run_${LSB_JOBINDEX}.logfile_window_dxy.txt
+cp logfile_window_Fsts.txt ../collect/run_${LSB_JOBINDEX}.logfile_window_Fsts.txt
+cp logfile_XX_rec_probs.txt ../collect/run_${LSB_JOBINDEX}.logfile_XX_rec_probs.txt
+cp logfile_XY_rec_probs.txt ../collect/run_${LSB_JOBINDEX}.logfile_XY_rec_probs.txt
+cp logfile_nonrec_region_size.txt ../collect/run_${LSB_JOBINDEX}.logfile_nonrec_region_size.txt
+cd ../
+done
+
+tar -zcvf example.100_iterations.2019-06-05.tar.gz example.100_iterations.2019-06-05
+
+mu_2.5e-7.rho_2e-7.gen_10k.chrom_100kb.beta_dist_0.1_30.2019-06-13
+
+rm -r example.100_iterations.2019-06-05
+rm -r sim*
+
+## local:
+scp mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/example.100_iterations.2019-06-05.tar.gz ./
+
+
+################################
+
+####################### looping over parameter space, job control by snakemake !
+
+rm -r *log*
+rm -r sims*
+
+mkdir logfiles_XY
+mkdir logfiles_XX
+mkdir logfiles_dxy
+mkdir logfiles_Fst
+
+
+################
+# Snakefile
+
+ms = [1e-7, 1e-9]
+rs = [1e-7, 1e-9]
+areas = [100, 1000, 10000]
+Ns = [50,500]
+replicates = range(1,100+1)
+
+		
+rule all:
+	input:
+		expand('logfile_nonrec_region_size.params.{m}.{r}.{a}.{N}.run_{rep}.txt', m = ms, r = rs, a = areas, N = Ns, rep = replicates)
+
+
+rule simulate_it:
+	output:
+		'logfile_nonrec_region_size.params.{m}.{r}.{a}.{N}.run_{rep}.txt'
+	shell:
+		"""
+		mkdir sims_{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}_dir
+		cd sims_{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}_dir  
+		python ../sexrecevo.blocrec.baseless.2019-06-21.py -m {wildcards.m} -r {wildcards.r} -a {wildcards.a} -N {wildcards.N} -s 100000 -g 10000 -logf 25 
+		cp logfile_window_dxy.txt ../logfiles_dxy/logfile_window_dxy.{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}.txt
+		cp logfile_window_Fsts.txt ../logfiles_Fst/logfile_window_Fsts..{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}.txt
+		cp logfile_XX_rec_probs.txt ../logfiles_XX/logfile_XX_rec_probs.{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}.txt
+		cp logfile_XY_rec_probs.txt ../logfiles_XY/logfile_XY_rec_probs.{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}.txt
+		cp logfile_nonrec_region_size.txt ../{output}
+		cd ../
+		sleep 2
+		rm -r sims_{wildcards.m}.{wildcards.r}.{wildcards.a}.{wildcards.N}.{wildcards.rep}_dir
+		"""
+
+
+#####
+# normal command, runs in the foregound, need to be logged into cluster:
+
+snakemake --jobs 100 --cluster 'bsub -n 1 -W 1:00 -R "rusage[mem=32000]" -M 48000000'
+
+
+
+####
+# How can I run Snakemake on a cluster where its main process is not allowed to run on the head node?
+# This can be achived by submitting the main Snakemake invocation as a job to the cluster! 
+
+bsub -J "snake" -n 1 -W 24:00 -R "rusage[mem=10000]" -M 48000000 snakemake --jobs 199 --cluster 'bsub -n 1 -W 24:00 -R "rusage[mem=2000]" -M 48000000'
+
+## kill all jobs if needed:
+for i in $( bjobs | awk '{print $1}' ) ; do bkill $i ; done
+
+
