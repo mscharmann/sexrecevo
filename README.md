@@ -1,5 +1,9 @@
 ## sexrecevo 
 
+## 2019-06-25
+- now measuring speed of expansion of the nonrec region and doing preliminary exploration of parameter space: examples in expansion_rates_examples.tar.gz
+- missing: a script to estimate the slope of a linear regression, of generation against the size of the nonrec region, averaged over all replicates of a parameter combination. The final output could perhaps be a barplot, with categories (parameter combinations) along the X and the height reflecting the speed of expansion, as e.g. "basepairs per generation".
+
 ## 2019-06-05
 - Dan: to code up plotting modules, use the 100 iterations in "example.100_iterations.2019-06-05.tar.gz"
 Should be self-explanatory. Just one parameter combination that was tweaked to show the desired effect.
