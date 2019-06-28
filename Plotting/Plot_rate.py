@@ -82,7 +82,7 @@ def Plot_rate(data_directory, target_files = None):
     subplot_index = 1
     colours = ["purple"]
 
-    for key in Avgd_data_dict:
+    for key in sorted(Avgd_data_dict.keys()): # so that results are plotted in a meaningful order
 
         plt.subplot(len(Avgd_data_dict),1,subplot_index)
 

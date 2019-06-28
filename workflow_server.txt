@@ -118,4 +118,4 @@ bsub -J "snake" -n 1 -W 24:00 -R "rusage[mem=10000]" -M 48000000 snakemake --job
 ## kill all jobs if needed:
 for i in $( bjobs | awk '{print $1}' ) ; do bkill $i ; done
 
-
+snakemake --cleanup-metadata logfile_nonrec_region_size.params.1e-09.1e-07.1000.500.run_61.txt 
