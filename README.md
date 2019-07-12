@@ -70,6 +70,6 @@ rho	nominal background recombination rate
 
 ## Plotcrastination
 
-[[https://github.com/mscharmann/sexrecevo/blob/master/chrom100kb.SD_50k.generations_5k.N_50.100_iterations.2019-06-06/test_gif.gif]]
+![](https://github.com/mscharmann/sexrecevo/blob/master/chrom100kb.SD_50k.generations_5k.N_50.100_iterations.2019-06-06/test_gif.gif)
 
 
