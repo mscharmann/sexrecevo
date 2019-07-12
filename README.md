@@ -67,3 +67,9 @@ mu	mutation rate
 rho	nominal background recombination rate 
 
 "area" (number of bases) affected by the reduction in recombination (could be a single value, or a distribution)
+
+## Plotcrastination
+
+[[https://github.com/mscharmann/sexrecevo/blob/master/chrom100kb.SD_50k.generations_5k.N_50.100_iterations.2019-06-06/test_gif.gif]]
+
+
