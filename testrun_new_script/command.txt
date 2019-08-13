@@ -1,0 +1,1 @@
+python sexrecevo.blocrec.baseless.2019-07-28.py -m 1e-05 -r 1e-06 -N 50 -g 10000 -s 5000 -logf 100 -logw 100

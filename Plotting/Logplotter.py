@@ -30,19 +30,21 @@ def Logplotter(logfile_dir, Stat_to_plot):
             logfiles.append("%s/%s" % (logfile_dir, logfile))
 
     ## Get the number of generations
+    # Mathias modified: if some runs are incomplete for the number of generations, find the largest generation that was achieved in any of the runs (files)
     generations = []
-
-    for line in open(logfiles[0], 'r').readlines():
-        if not any(["site" in line, "generation" in line]):
-            generations.append(int(line.split()[0]))
-
-
+    for f in logfiles:
+        with open(f, "r") as F:
+    	    for line in F:
+                if not any(["site" in line, "generation" in line]):
+                    generations.append(int(line.split()[0]))    			
+    g = sorted(list(set(generations)), key = int)
+    generations = g
+	
     ## Get the windows
 
     for line in open(logfiles[0], 'r').readlines():
         if "generation" in line:
             windows = line.split()[2:]
-
     ## Note - all the files in the simulation directory must have the same generation and window number!
 
 
@@ -127,8 +129,11 @@ def Logplotter(logfile_dir, Stat_to_plot):
     ax1.spines["right"].set_visible(False)
     ax1.patch.set_visible(False)
     
-    ## sample 50 tick labels for the x axis
-    xtick_sampler = int(np.round(len(windows)/50))
+    ## sample 50 tick labels for the x axis, Mathias modified: unless there aren't many windows anyway
+    if int(np.round(len(windows)/50)) == 0:
+    	xtick_sampler = 1
+    else:
+    	xtick_sampler = int(np.round(len(windows)/50))
     ax1.set_xticks(range(0,len(windows), xtick_sampler))
     ax1.set_xticklabels(windows[::xtick_sampler],rotation = 30) 
     

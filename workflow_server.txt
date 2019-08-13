@@ -113,9 +113,250 @@ snakemake --jobs 100 --cluster 'bsub -n 1 -W 1:00 -R "rusage[mem=32000]" -M 4800
 # How can I run Snakemake on a cluster where its main process is not allowed to run on the head node?
 # This can be achived by submitting the main Snakemake invocation as a job to the cluster! 
 
-bsub -J "snake" -n 1 -W 24:00 -R "rusage[mem=10000]" -M 48000000 snakemake --jobs 199 --cluster 'bsub -n 1 -W 24:00 -R "rusage[mem=2000]" -M 48000000'
+bsub -J "snake" -n 1 -W 72:00 -R "rusage[mem=10000]" -M 48000000 snakemake --jobs 199 --cluster 'bsub -q "normal" -n 1 -R "rusage[mem=2000]" -M 48000000 -o out.txt'
 
 ## kill all jobs if needed:
 for i in $( bjobs | awk '{print $1}' ) ; do bkill $i ; done
 
+## sometimes ncecessary:
 snakemake --cleanup-metadata logfile_nonrec_region_size.params.1e-09.1e-07.1000.500.run_61.txt 
+
+## but can also submit the master snakemake to a compute node directly...
+ssh mscharma@cpt184
+
+
+
+
+########################
+# exploring mutations that only cause partial reduction in recombination probability
+
+cd /Users/scharmann/Documents/git_repositories/sexrecevo
+scp sexrecevo.blocrec.baseless.2019-07-02.py mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/partial_effects/
+
+
+cd /scratch/temporary/mscharma/sims/partial_effects
+
+rm -r *log*
+rm -r sims*
+
+mkdir logfiles_XY
+mkdir logfiles_XX
+mkdir logfiles_dxy
+mkdir logfiles_Fst
+
+bsub -J "snake" -n 1 -W 72:00 -R "rusage[mem=10000]" -M 48000000 snakemake --jobs 199 --cluster 'bsub -q "normal" -n 1 -R "rusage[mem=2000]" -M 48000000 -o out.txt'
+
+# or submit in a screen:, give -o somefile or else WILL send emai for each job exited/finished! do not give -W otherwise will sometimes kill job after incorrect amount of time has passed! (LSF bug?)
+snakemake --jobs 199 --cluster 'bsub -q "normal" -n 1 -R "rusage[mem=500]" -M 4800000 -o out.txt'
+
+################ 
+# Snakefile
+
+ms = [1e-6]
+rs = [1e-6,1e-7]
+areas = [1,5]
+es = [1,0.75,0.5,0.33,0.1]
+Ns = [50]
+replicates = range(1,25+1)
+
+		
+rule all:
+	input:
+		expand('logfile_nonrec_region_size.params.{m}_{r}_{a}_{e}_{N}.run_{rep}.txt', m = ms, r = rs, a = areas, e = es, N = Ns, rep = replicates)
+
+
+rule simulate_it:
+	output:
+		'logfile_nonrec_region_size.params.{m}_{r}_{a}_{e}_{N}.run_{rep}.txt'
+	shell:
+		"""
+		mkdir sims_{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}_dir
+		cd sims_{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}_dir  
+		python2.7 ../sexrecevo.blocrec.baseless.2019-07-15.py -m {wildcards.m} -r {wildcards.r} -a {wildcards.a} -N {wildcards.N} -s 1000 -g 1000000 -logf 1000 -e {wildcards.e} -logw 50 
+		cp logfile_window_dxy.txt ../logfiles_dxy/logfile_window_dxy.{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_window_Fsts.txt ../logfiles_Fst/logfile_window_Fsts.{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_XX_rec_probs.txt ../logfiles_XX/logfile_XX_rec_probs.{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_XY_rec_probs.txt ../logfiles_XY/logfile_XY_rec_probs.{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_nonrec_region_size.txt ../{output}
+		cd ../
+		sleep 2
+		rm -r sims_{wildcards.m}_{wildcards.r}_{wildcards.a}_{wildcards.e}_{wildcards.N}_{wildcards.rep}_dir
+		"""
+
+
+python ../sexrecevo.blocrec.baseless.2019-07-02.py -m 1e-07 -r 1e-07 -a 5 -N 50 -s 1000 -g 100 -logf 10 -e 0.33 -logw 50 
+
+## run snakemake in screens
+## check progress:
+
+tail -n 1 sims_1e-0*/*nonrec* | cut -f1,2
+
+## harvest some runs manually:
+mkdir test
+cnt=0
+for i in sims_1e-06_1e-06_1_1_50* ; do
+cnt=$(( $cnt+1 ))
+echo $cnt
+cd $i
+cp logfile_window_dxy.txt ../test/run_${cnt}.logfile_window_dxy.txt
+cp logfile_window_Fsts.txt ../test/run_${cnt}.logfile_window_Fsts.txt
+cp logfile_XX_rec_probs.txt ../test/run_${cnt}.logfile_XX_rec_probs.txt
+cp logfile_XY_rec_probs.txt ../test/run_${cnt}.logfile_XY_rec_probs.txt
+cp logfile_nonrec_region_size.txt ../test/run_${cnt}.logfile_nonrec_region_size.txt
+cd ../
+done
+mv test test_sims_1e-06_1e-06_1_1_50
+tar -zcvf test_sims_1e-06_1e-06_1_1_50.tar.gz test_sims_1e-06_1e-06_1_1_50
+
+
+########## END OF JULY 2019:
+
+cd /Users/scharmann/Documents/git_repositories/sexrecevo
+scp sexrecevo.SNPs.2019-08-03.py mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/runs_2019-08-11/
+
+
+cd /scratch/temporary/mscharma/sims/runs_2019-08-11/
+
+
+rm -r *log*
+rm -r sims*
+
+mkdir logfiles
+
+
+# or submit in a screen:, give -o somefile or else WILL send emai for each job exited/finished! do not give -W otherwise will sometimes kill job after incorrect amount of time has passed! (LSF bug?)
+snakemake --jobs 199 --cluster 'bsub -q "long" -n 1 -R "rusage[mem=500]" -M 4800000 -o out.txt'
+
+## check progress:
+
+tail -n 1 sims_1e-0*/*dxy* | cut -f1,2
+
+
+################ 
+# Snakefile
+
+ms = [1e-6,1e-5]
+rs = [1e-9,1e-6,1e-5,1e-4]
+Ns = [20,50,100]
+rwss = [20,50,100]
+min_idents = [0.805,0.9,0.95]
+replicates = range(1,25+1)
+
+		
+rule all:
+	input:
+		expand('logfiles_{m}_{r}_{rws}_{min_ident}_{N}_/logfile_XY_rec_probs.{m}_{r}_{rws}_{min_ident}_{N}_{rep}.txt', m = ms, r = rs, rws = rwss, min_ident = min_idents, N = Ns, rep = replicates)
+
+
+rule simulate_it:
+	output:
+		'logfiles_{m}_{r}_{rws}_{min_ident}_{N}_/logfile_XY_rec_probs.{m}_{r}_{rws}_{min_ident}_{N}_{rep}.txt'
+	shell:
+		"""
+		mkdir sims_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}_dir
+		cd sims_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}_dir  
+		python2.7 ../sexrecevo.SNPs.2019-08-03.py -m {wildcards.m} -r {wildcards.r} -N {wildcards.N} -rws {wildcards.rws} -min_ident {wildcards.min_ident} -g 20000 -s 5000 -logf 100 -logw 100 
+		cp logfile_window_dxy.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_window_dxy.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_window_Fsts.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_window_Fsts.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_XX_rec_probs.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_XX_rec_probs.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_XY_rec_probs.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_XY_rec_probs.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_nonrec_region_size.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_nonrec_region_size.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt
+		cp logfile_duration.txt ../logfiles_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_/logfile_duration.{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}.txt		
+cd ../
+		sleep 2
+		rm -r sims_{wildcards.m}_{wildcards.r}_{wildcards.rws}_{wildcards.min_ident}_{wildcards.N}_{wildcards.rep}_dir
+		"""
+
+#####
+
+## kill all jobs if needed:
+for i in $( bjobs | grep normal | awk '{print $1}' ) ; do bkill $i ; done
+
+
+###
+mv logfiles SNPs_new_script_m1e-6_r1e-6_N50_s10000_g50k.2019-07-30
+tar -zcvf SNPs_new_script_m1e-6_r1e-6_N50_s10000_g50k.2019-07-30.tar.gz SNPs_new_script_m1e-6_r1e-6_N50_s10000_g50k.2019-07-30
+
+
+## local:
+scp mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/partial_2/SNPs_new_script_m1e-6_r1e-6_N50_s10000_g50k.2019-07-30.tar.gz ./
+
+tar -xzf wsize80_100runs.tar.gz
+
+##### remove-temp
+setwd("~/Documents/git_repositories/sexrecevo/")
+mydata <- read.table("f_recws.txt", header = FALSE)
+hist(mydata[,1], breaks = 100)
+
+mydata <- read.table("m_recws.txt", header = FALSE)
+hist(mydata[,1], breaks = 100)
+
+
+
+## collect results!
+
+
+import argparse
+import os
+
+chrom_length = 5000
+
+indirs = [x for x in os.listdir(".") if (x.startswith("logfiles_") and x.endswith("_"))]
+
+outlines = ["\t".join(["m","r","rws","N","generations","total_growth_sites","rate_sites_per_generation"])]
+for d in indirs:
+	params = d.split("_")
+	m = params[1]
+	r = params[2]
+	rws = params[3] 
+	N = params[4]
+	infiles = [x for x in os.listdir(d) if "nonrec" in x]
+	for i in infiles:
+		F = open(d + "/" + i, "r")
+		F.readline()
+		size_gen_zero = int(F.readline().strip("\n").split("\t")[1])
+		files_lines = F.readlines()
+		F.close()
+		total_generations = files_lines[-1].strip("\n").split("\t")[0]
+		size_at_end = int(files_lines[-1].strip("\n").split("\t")[1])
+		if size_at_end == chrom_length:
+			# entire segment became non-recombining, so we can't measure the growth rate just like this. it is an underestimate. Instead, get the nonrec size from the generation just before the entire segment became non-recombining.
+			hit = 0
+			size_at_hit = 0
+			with open(d + "/" + i, "r") as F:
+				F.readline()
+				for line in F:
+					fields = line.strip("\n").split("\t")
+					if int(fields[1]) < chrom_length:
+						if int(fields[0]) > hit:
+							hit = int(fields[0])
+							size_at_hit = int(fields[1])
+					elif int(fields[1]) >= chrom_length:
+						print line
+						print hit, size_at_hit
+						break
+			total_generations = str(hit)
+			size_at_end = size_at_hit			
+		growth = size_at_end - size_gen_zero
+		outlines.append("\t".join([m,r,rws,N, total_generations, str(growth), str(growth/float(total_generations))]))
+			
+
+with open("growth_rate_report.txt", "w") as F:
+	F.write("\n".join(outlines)+ "\n")			
+			
+
+
+###### R-code to plot this:
+setwd("/Users/scharmann/Documents/git_repositories/sexrecevo")
+mydata <- read.table("growth_rate_report.txt", header = TRUE)
+mydata$log10m <- log(mydata$m, 10)
+
+
+library(ggplot2)
+
+p1 <- ggplot(mydata, aes(group=m, y=rate_sites_per_generation+0.001)) + 
+  geom_boxplot()
+	
+
+
+
