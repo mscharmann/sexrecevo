@@ -4,6 +4,68 @@
 to avoid slow-down of the simulations by large numbers of mutations which have no further effect:
 once a region becomes fully non-recombining, no further mutations are allowed at its core
 
+# 2019-07-28: re-implementation of the main loop and functions!! Meiosis NOT YET working
+
+python sexrecevo.blocrec.baseless.2019-07-28.py -m 1e-06 -r 1e-06 -N 50 -g 100000 -s 10000 -logf 200 -logw 100 
+
+ultralight: removed dispersal stuff!
+
+attempt to fix bug that nonrec-regions sometimes appeared to re-gain (some) recombination:
+	- go for true infinite-sites model by excluding mutations in sites that are already variants. 
+		: if re-gain of rec is caused by mutation towards of a "1" allele on the X at a position that was previously fixed heterozygous! 
+
+read also: Ortiz-Barrientos et al. Recombination rate evolution and the origin of species.
+
+ideas to improve algorithm:
+	https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2323826/
+	infinite sites+array of integers instead of sequence strings, "look-ahead" to only work on chroms that can leave offspring in future generations..
+
+=> also here need to implement:
+	- recording of Fst
+	- recording of Rec-rate
+	- translate allele-string into actual sequences (for exporting examples to alignment viewers or so.)
+
+- a population of diploids, size can change but is capped at NMAX by random culling (carrying capacity) => better implementation of K: a probability of survival that is antiproportional to the number of indiv => fluctuation around NMAX should result.
+- generations are non-overlapping, asexual reproduction is not considered, pre-reproductive mortality is zero
+- no spatial structure / mates are drawn at random (but respecting ovule - sperm pairing)
+	spatial structure implementation: X and Y coordinates as additional traits of individuals!! reflecting boundaries of grid, or "circular". Dispersal drawing two distances from dispersal kernel distribution.
+
+
+principal steps of each cycle:
+- cap the population size
+- . . .
+"""
+
+"""
+generate starting population of chromosomes by backward simulations under the coalescent for a constant-size unstructured population
+
+mspath=/Users/scharmann/Downloads/msdir
+sgpath=/Users/scharmann/Downloads/Seq-Gen-1.3.4/source
+
+# theta = 4*Ne*mu*sites = 4*100000*7*10^-9*10000 = 28
+
+cd /Users/scharmann/Documents/sexchrom_evol_recomb_simulations
+
+$mspath/ms 200 1 -t 28.0 -r 28.0 10000 -T | grep '('> trees.tre
+
+$sgpath/seq-gen -mGTR -s 0.01 -l 10000 -p $(cat trees.tre | wc -l) -f 0.15 0.35 0.15 0.35 -i 0.0 -a 5.0 -g 3 < trees.tre> start.aln
+
+# maybe better another sequence simulator, which can evolve indels and inversions as well??
+indelible - indels but no inversions
+
+Hmm not lets not mess with these - just turn some of the SNPs into indels and inversions myself!
+
+https://www.nature.com/articles/ng.911#s1
+
+"Across all 80 strains, we identified 4,902,039 SNPs and 810,467 small indels" => "1- to 20-bp insertions and deletions"
+=> ratio of small indels to SNPs in Ath is about 810467/4902039 = 16.5%
+
+https://www.sciencedirect.com/science/article/pii/S0092867416306675
+After filtering, the nuclear genomes contained 10,707,430 biallelic SNPs and 1,424,879 small-scale indels (up to 40 bp).
+=> 1424879/10707430 = 13.3%
+
+
+
 """
 
 import numpy, random, os, argparse, datetime
@@ -624,6 +686,41 @@ def del_list_inplace(l, id_to_del):
     return l
 
 
+def multidimensional_shifting(num_samples, sample_size, elements, probabilities):
+	# a VERY FAST random sampling function, orders of magnitude faster than numpy.random.choice,
+	# https://medium.com/ibm-watson/incredibly-fast-random-sampling-in-python-baf154bd836a	
+
+	# replicate probabilities as many times as `num_samples`
+	replicated_probabilities = numpy.tile(probabilities, (num_samples, 1))    # get random shifting numbers & scale them correctly
+	random_shifts = numpy.random.random(replicated_probabilities.shape)
+	random_shifts /= random_shifts.sum(axis=1)[:, numpy.newaxis]    # shift by numbers & find largest (by finding the smallest of the negative)
+	shifted_probabilities = random_shifts - replicated_probabilities
+	return numpy.argpartition(shifted_probabilities, sample_size, axis=1)[:, :sample_size]			
+
+def invert_sequence (pop, variant_idxes, sexdet_site, chrom_length):
+	
+	inv_pop = []
+	for sex in [0,1]:
+		inv_pop.append([])
+		for sample in pop[sex]:
+			inv_pop[sex].append([ sample[0][::-1] , sample[1][::-1] ])
+#			print i, [ i[0][::-1] , i[1][::-1] ]
+#		print len(inv_pop[sex])	
+			
+	inv_variant_idxes = []
+	for v in variant_idxes:
+		inv_variant_idxes.append( chrom_length - v )
+	
+	inv_variant_idxes = sorted(inv_variant_idxes, key = int)
+	
+	inv_sexdet_site = chrom_length - sexdet_site 
+	
+#	print variant_idxes
+#	print inv_variant_idxes
+	
+#	print sexdet_site, inv_sexdet_site
+	
+	return inv_pop, inv_variant_idxes, inv_sexdet_site
 
 def report_duration(start_time):
 	
