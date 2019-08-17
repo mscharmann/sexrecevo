@@ -1,5 +1,18 @@
 ## sexrecevo 
 
+## 2019-08-17
+-  exploration of parameter space: growth_rate_report.txt
+	contains the measured growth rate of the non-recombining region in 50 replicates for each of 216 parameter combinations, total 10800 simulation runs. Simulations start with a non-recombining region of c. 50-200 bases, depending on parameters. We do not start from zero to avoid the time-lag for mutations to come in and establish the first windows of sufficient divergence. However, it means that we have negative growth in some scenarios, as the nonrec starting block can be eroded. These might be treated as growth rate = 0. The script used was "sexrecevo.SNPs.2019-08-03.py".
+	The parameters are:
+	- 2 mutation rates
+	- 4 recombination rates
+	- 3 recombination-window-sizes
+	- 3 minimum-identity thresholds (min ident in the rec window, if ident below threshold rec prob drops to zero)
+	- 3 population sizes
+	Full details of the runs, including logfiles for XX, XY rec probs and Fst, dxy are here:
+		(server)
+		/scratch/temporary/mscharma/sims/runs_2019-08-11.tar.gz
+	
 ## 2019-06-25
 - now measuring speed of expansion of the nonrec region and doing preliminary exploration of parameter space: examples in expansion_rates_examples.tar.gz
 - missing: a script to estimate the slope of a linear regression, of generation against the size of the nonrec region, averaged over all replicates of a parameter combination. The final output could perhaps be a barplot, with categories (parameter combinations) along the X and the height reflecting the speed of expansion, as e.g. "basepairs per generation".

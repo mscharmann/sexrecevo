@@ -204,21 +204,32 @@ def report_window_rec_probs (generation, window_size, step_size, avg_rec_rates, 
 
 def report_window_male_female_Fst_and_dxy (inpop, variant_idxes, sample_size, generation, window_size, step_size, chrom_length):
 
-	# random sample from population
+	# random sample from population => take the first 0.5*sample_size individuals from the m, f arrays
 	all_indivs = inpop[0] + inpop[1]
 	
 	males = inpop[0]
 	females = inpop[1]
 	
-	msamples = numpy.random.choice(range(len(males)), size=int(sample_size*0.5))
-	msamples = [[males[x][0],males[x][1]] for x in msamples]
+	try:
+		msamples = range(len(males))[:int(sample_size*0.5)+1]
+	except IndexError:
+		msamples = range(len(males))
 	
-	fsamples = numpy.random.choice(range(len(females)), size=int(sample_size*0.5))
-	fsamples = [[females[x][0],females[x][1]] for x in fsamples]
+	try:
+		fsamples = range(len(females))[:int(sample_size*0.5)+1]
+	except IndexError:
+		fsamples = range(len(females))
 	
-	msamples_flat = [y for x in msamples for y in x]
-	fsamples_flat = [y for x in fsamples for y in x]
-	
+	msamples_flat = []
+	for i in msamples:
+		msamples_flat.append(males[i][0])
+		msamples_flat.append(males[i][1])
+
+	fsamples_flat = []
+	for i in fsamples:
+		fsamples_flat.append(females[i][0])
+		fsamples_flat.append(females[i][1])
+
 	samples_flat = msamples_flat + fsamples_flat
 		
 	n_chroms_sampled = float(sample_size*2)
@@ -305,8 +316,7 @@ def report_window_male_female_Fst_and_dxy (inpop, variant_idxes, sample_size, ge
 			A.write("\t".join(["","site"]) + "\n")
 			A.write("\t".join([str(x) for x in header]) + "\n")
 			A.write("\t".join([str(x) for x in window_dxys])+ "\n")
-
-
+	
 def find_consecutive_zeros (sequence):
 	
 	zero_idxes = []
@@ -682,7 +692,7 @@ for generation in range(int(args.g)+1):
 	sampled_parents = sample_parents (N, pop)
 	if (float(generation)/logf).is_integer(): # every x generations report something
 		male_gametes, female_gametes, avg_X_Y_rec_probs, avg_X_X_rec_probs = make_gametes_meioses (pop, N, sampled_parents, variant_idxes, chrom_length, nominal_overall_rec_rate_per_site, sexdet_site, rec_window_size, min_ident, True)
-		report_window_male_female_Fst_and_dxy (pop, variant_idxes, 20.0, generation, logw, int(0.5*logw), chrom_length)
+		report_window_male_female_Fst_and_dxy (pop, variant_idxes, 60.0, generation, logw, int(0.5*logw), chrom_length)
 		report_window_rec_probs (generation, logw, int(0.5*logw), avg_X_Y_rec_probs, "XY")
 		report_window_rec_probs (generation, logw, int(0.5*logw), avg_X_X_rec_probs, "XX")
 		print generation, len(variant_idxes)

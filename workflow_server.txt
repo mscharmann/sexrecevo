@@ -303,13 +303,15 @@ chrom_length = 5000
 
 indirs = [x for x in os.listdir(".") if (x.startswith("logfiles_") and x.endswith("_"))]
 
-outlines = ["\t".join(["m","r","rws","N","generations","total_growth_sites","rate_sites_per_generation"])]
+outlines = ["\t".join(["m","r","rws","min_ident","N","generations","total_growth_sites","rate_sites_per_generation"])]
 for d in indirs:
 	params = d.split("_")
+	print params
 	m = params[1]
 	r = params[2]
-	rws = params[3] 
-	N = params[4]
+	rws = params[3]
+	min_ident = params[4] 
+	N = params[5]
 	infiles = [x for x in os.listdir(d) if "nonrec" in x]
 	for i in infiles:
 		F = open(d + "/" + i, "r")
@@ -338,7 +340,7 @@ for d in indirs:
 			total_generations = str(hit)
 			size_at_end = size_at_hit			
 		growth = size_at_end - size_gen_zero
-		outlines.append("\t".join([m,r,rws,N, total_generations, str(growth), str(growth/float(total_generations))]))
+		outlines.append("\t".join([m,r,rws,min_ident,N, total_generations, str(growth), str(growth/float(total_generations))]))
 			
 
 with open("growth_rate_report.txt", "w") as F:
@@ -358,5 +360,17 @@ p1 <- ggplot(mydata, aes(group=m, y=rate_sites_per_generation+0.001)) +
   geom_boxplot()
 	
 
+############### an endless run with biologically realistic parameters
+cd /Users/scharmann/Documents/git_repositories/sexrecevo
+scp sexrecevo.SNPs.2019-08-03.py mscharma@devfrt.vital-it.ch:/scratch/temporary/mscharma/sims/endless_run/
 
+
+cd /scratch/temporary/mscharma/sims/endless_run
+# screen -r endless
+
+python sexrecevo.SNPs.2019-08-03.py -m 7e-9 -r 5.52e-08 -rws 100 -min_ident 0.805 -N 50 -g 10000000 -s 10000 -logf 100 -logw 100
+
+plant SNP mutation rate =   7e-9
+Arabidopsis rec rate = 1.38 events per chromosome, mean chromosome size = 125 Mbp / 5 = 25 Mbp => 1.38/25000000 = 5.52e-08
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3313057/                                   
 
