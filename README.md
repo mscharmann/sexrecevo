@@ -9,9 +9,8 @@
 	- 3 recombination-window-sizes
 	- 3 minimum-identity thresholds (min ident in the rec window, if ident below threshold rec prob drops to zero)
 	- 3 population sizes
-	Full details of the runs, including logfiles for XX, XY rec probs and Fst, dxy are here:
-		(server)
-		/scratch/temporary/mscharma/sims/runs_2019-08-11.tar.gz
+	
+Full details of the runs, including logfiles for XX, XY rec probs and Fst, dxy are here (server): /scratch/temporary/mscharma/sims/runs_2019-08-11.tar.gz
 	
 ## 2019-06-25
 - now measuring speed of expansion of the nonrec region and doing preliminary exploration of parameter space: examples in expansion_rates_examples.tar.gz
