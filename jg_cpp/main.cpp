@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <assert.h>
 
 using namespace std;
 int draw_unii(int i_min, int i_max, mt19937 &i_generator){
@@ -18,7 +19,6 @@ int draw_unii(int i_min, int i_max, mt19937 &i_generator){
 }
 
 int make_weighted_draw(vector <double> &w_prob_vector, mt19937 &w_generator){
-	//cout<<"Making weighted draw"<<endl;
 	//maybe just initialize once!
 	//random_device w_rand_dev;
         //mt19937 w_generator(w_rand_dev());
@@ -56,7 +56,8 @@ class genotype_matrix{
 	//takes vector of sexes of individuals and adds them in this order to the genotype array...
 	//determines left positions in for block var array and recombination probs
 	vector <int> recomb_left_positions_var;		
-	vector <double> recomb_probs_var;		
+	vector <double> recomb_probs_var;
+	vector <int> block_var;	
 	public:
 	genotype_matrix(vector <char> &ind_sexes, int gen_size, int sd_s, int mean_rec_prob_window_size){
 		y_size=ind_sexes.size()*2;
@@ -77,8 +78,8 @@ class genotype_matrix{
 				genotype_array.push_back('0');
 			}
 		}
-		genotype_array.reserve(10000);
-		temp_array.reserve(10000);
+		genotype_array.reserve(100000);
+		temp_array.reserve(100000);
 		ga_pointer=&genotype_array;
 		ta_pointer=&temp_array;
 		prob_vector.reserve(gen_size-1);
@@ -88,7 +89,8 @@ class genotype_matrix{
 		int mean_rec_prob_vector_size=gen_size/mean_rec_prob_window_size;
 		mean_rec_prob_vector.reserve(mean_rec_prob_vector_size);
 		mean_rec_prob_vector.assign(mean_rec_prob_vector_size,0);
-
+		recomb_left_positions_var.reserve(10000);
+		recomb_probs_var.reserve(10000);
 	}
 	~genotype_matrix(){
 		ga_pointer=nullptr;
@@ -174,15 +176,318 @@ class genotype_matrix{
 			recombined_gamete(rand_lr_site, ind_array_pos_rand);
 		}
 	}
+	
+	double determine_block_rec_prob(const int &brp_block_size, const int &brp_block_cov, const int &brp_wind_size, const double &brp_min_identity, const double &brp_var_effect){
+		double brp_rec_prob=0;
+		if(brp_block_size>0 && double(brp_wind_size-brp_block_cov)/brp_wind_size>brp_min_identity && brp_var_effect*brp_block_cov<brp_wind_size){
+			brp_rec_prob=(brp_block_size*(double(brp_wind_size-(brp_var_effect*brp_block_cov))/brp_wind_size))/genome_size;
+		}
+		return brp_rec_prob;
+	}
+	
+
+	void recomb_block(const int &rb_window_size, int &rb_curr_sum_var, const int &rb_var_site_count, int &rb_prev_block, int &rb_curr_block, const int &rb_curr_block_cov, int &rb_n_blocks, double &rb_curr_block_sum,const double &rb_min_identity, const double &rb_var_effect ){
+		double curr_block_prob;
+//		cout<<"Calling recomb_block, curr_block="<<rb_curr_block<<", prev_block="<<rb_prev_block<<endl;
+		if(rb_curr_sum_var<rb_var_site_count){
+			while(rb_curr_sum_var<rb_var_site_count-1 && rb_prev_block>position_array[recomb_left_positions_var[rb_curr_sum_var]]){
+				/*
+				if(recomb_probs_var.size()>rb_curr_sum_var){
+					recomb_probs_var[rb_curr_sum_var]=rb_curr_block_sum;
+				}
+				else{
+					recomb_probs_var.emplace_back(rb_curr_block_sum);
+				}
+				*/
+				recomb_probs_var.emplace_back(rb_curr_block_sum);
+				rb_curr_block_sum=0;
+				if(rb_curr_block_sum<rb_var_site_count-1){
+					rb_curr_sum_var++;
+				}
+			}
+			if(rb_curr_block<=position_array[recomb_left_positions_var[rb_curr_sum_var]]){
+//				cout<<"\t1 Adding block prob. Begin: "<<rb_prev_block<<", End: "<<rb_curr_block<<", Cov: "<<rb_curr_block_cov<<endl;
+		/*		
+				//only add sum if block identity is larger than min identity...
+				if((double(rb_curr_block_cov)/double(rb_curr_block-rb_prev_block))<1-rb_min_identity){
+				//include min coverage and site effect here...
+					curr_block_prob=(rb_curr_block-rb_prev_block-(rb_var_effect*(rb_curr_block_cov/double(rb_curr_block-rb_prev_block))))/genome_size;
+					if(curr_block_prob<0){
+						curr_block_prob=0;
+					}
+					rb_curr_block_sum+=curr_block_prob;
+				}
+			*/
+				rb_curr_block_sum+=determine_block_rec_prob(rb_curr_block-rb_prev_block, rb_curr_block_cov,rb_window_size, rb_min_identity, rb_var_effect );
+			}
+				
+			else{
+//				cout<<"\t2 Adding block prob. Begin: "<<rb_prev_block<<", End: "<<position_array[recomb_left_positions_var[rb_curr_sum_var]]<<", Cov: "<<rb_curr_block_cov<<endl;
+				/*
+				if(position_array[recomb_left_positions_var[rb_curr_sum_var]]>rb_prev_block && (double(rb_curr_block_cov)/double(position_array[recomb_left_positions_var[rb_curr_sum_var]]-rb_prev_block))<1-rb_min_identity){
+					curr_block_prob=(position_array[recomb_left_positions_var[rb_curr_sum_var]]-rb_prev_block-(rb_var_effect*(rb_curr_block_cov/double(position_array[recomb_left_positions_var[rb_curr_sum_var]]-rb_prev_block))))/genome_size;
+					if(curr_block_prob<0){
+						curr_block_prob=0;
+					}
+					rb_curr_block_sum+=curr_block_prob;
+				}
+				*/
+				rb_curr_block_sum+=determine_block_rec_prob(position_array[recomb_left_positions_var[rb_curr_sum_var]]-rb_prev_block, rb_curr_block_cov,rb_window_size, rb_min_identity, rb_var_effect );
 
 
-	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, mt19937 &rc_randgen_var, double general_rec_prob){
+				recomb_probs_var.emplace_back(rb_curr_block_sum);
+				
+				//continue here...
+				while(rb_curr_sum_var+1<rb_var_site_count && position_array[recomb_left_positions_var[rb_curr_sum_var+1]]<rb_curr_block){
+//					cout<<"\t3 Adding block prob. Begin: "<<position_array[recomb_left_positions_var[rb_curr_sum_var]]+1<<", End: "<<position_array[recomb_left_positions_var[rb_curr_sum_var+1]]<<", Cov: "<<rb_curr_block_cov<<endl;
+					/*
+					if((double(rb_curr_block_cov)/double(position_array[recomb_left_positions_var[rb_curr_sum_var+1]]-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1))<1-rb_min_identity){
+					
+						rb_curr_block_sum=(position_array[recomb_left_positions_var[rb_curr_sum_var+1]]-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1-(rb_var_effect*(rb_curr_block_cov/double(position_array[recomb_left_positions_var[rb_curr_sum_var+1]]-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1))))/genome_size;
+						if(rb_curr_block_sum<0){
+							rb_curr_block_sum=0;
+						}
+					}
+					else{
+						rb_curr_block_sum=0;
+					}
+					*/
+					rb_curr_block_sum=determine_block_rec_prob(position_array[recomb_left_positions_var[rb_curr_sum_var+1]]-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1, rb_curr_block_cov,rb_window_size, rb_min_identity, rb_var_effect );
 
 
-		//TODO: do a random draw to test if recombination will take place
-		vector <double> gr_probs={general_rec_prob, 1-general_rec_prob};
-		if(make_weighted_draw(gr_probs, rc_randgen_var)==0){
+					
+					/*
+					if(recomb_probs_var.size()>rb_curr_sum_var){
+						recomb_probs_var[rb_curr_sum_var]=rb_curr_block_sum;
+					}
+					else{
+						recomb_probs_var.emplace_back(rb_curr_block_sum);
+					}
+					*/
+					recomb_probs_var.emplace_back(rb_curr_block_sum);
+					if(rb_curr_sum_var<rb_var_site_count){
+						rb_curr_sum_var++;
+					}
+				}
+//				cout<<"\t4 Adding block prob. Begin: "<<position_array[recomb_left_positions_var[rb_curr_sum_var]]+1<<", End: "<<rb_curr_block<<", Cov: "<<rb_curr_block_cov<<endl;
+				/*
+				if((double(rb_curr_block_cov)/double(rb_curr_block-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1))<1-rb_min_identity){
+					rb_curr_block_sum=(rb_curr_block-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1-(rb_var_effect*(rb_curr_block_cov/double(rb_curr_block-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1))))/genome_size;
+					if(rb_curr_block_sum<0){
+						rb_curr_block_sum=0;
+					}
+				}
+				else{
+					rb_curr_block_sum=0;
+				}
+				*/
+				rb_curr_block_sum=determine_block_rec_prob(rb_curr_block-position_array[recomb_left_positions_var[rb_curr_sum_var]]+1, rb_curr_block_cov,rb_window_size, rb_min_identity, rb_var_effect );
 
+				if(rb_curr_sum_var<rb_var_site_count){
+					rb_curr_sum_var++;
+				}
+			}
+		}
+		else{
+//			cout<<"\t5 Adding block prob. Begin: "<<rb_prev_block<<", End: "<<rb_curr_block<<", Cov: "<<rb_curr_block_cov<<endl;
+			/*
+			if(double(rb_curr_block_cov)/double(rb_curr_block-rb_prev_block)<1-rb_min_identity){
+				curr_block_prob=(rb_curr_block-rb_prev_block-(rb_var_effect*(rb_curr_block_cov/double(rb_curr_block-rb_prev_block))))/genome_size;
+				if(curr_block_prob<0){
+					curr_block_prob=0;
+				}
+				rb_curr_block_sum+=curr_block_prob;
+			}
+			
+		
+		*/
+			rb_curr_block_sum+=determine_block_rec_prob(rb_curr_block-rb_prev_block, rb_curr_block_cov,rb_window_size, rb_min_identity, rb_var_effect );
+		}	
+		rb_prev_block=rb_curr_block+1;
+		rb_n_blocks++;
+	}
+
+
+	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, const double &rg_var_effect, mt19937 &rc_randgen_var, const double &genome_rec_prob){
+			//vector <double> recomb_probs_var;
+			//vector <int> recomb_left_positions_var;
+			int window_end_it=0;
+			int left_window;
+			int curr_block_cov=0;
+			int n_var_sites=0;
+			int n_blocks=0;
+			int curr_block=0;
+			int prev_block=0;
+			double curr_block_sum=0;
+			int curr_sum_var=0;
+			double add_block;
+			//empty recomb_probs_var
+			recomb_probs_var.clear();
+			//iterate over position array
+			for(int i_rc_pos=0; i_rc_pos<position_array.size(); i_rc_pos++){
+				//only use sides that are variable between both seqs
+				if((*ga_pointer)[(ind_array_pos_var.first*x_size)+i_rc_pos] != (*ga_pointer)[(ind_array_pos_var.second*x_size)+i_rc_pos]){
+					//remember variable site first!
+					if(recomb_left_positions_var.size()>n_var_sites){
+						recomb_left_positions_var[n_var_sites]=i_rc_pos;
+					}
+					else{
+						recomb_left_positions_var.emplace_back(i_rc_pos);
+					}
+					left_window=position_array[i_rc_pos]-(rg_window_size_var/2);	
+					while(position_array[recomb_left_positions_var[window_end_it]]+(rg_window_size_var/2)<left_window){
+						curr_block=position_array[recomb_left_positions_var[window_end_it]]+(rg_window_size_var/2);
+						if(prev_block<curr_block){
+//							cout<<"rc_call 1"<<endl;
+							recomb_block(rg_window_size_var, curr_sum_var, n_var_sites, prev_block, curr_block, curr_block_cov, n_blocks, curr_block_sum, rg_min_ident_var, rg_var_effect );
+						}
+						window_end_it++;
+						curr_block_cov--;
+					}
+					if(left_window>0){
+						if(n_blocks>0){
+							if(prev_block<left_window){
+//								cout<<"rc_call 2"<<endl;
+								recomb_block(rg_window_size_var,curr_sum_var, n_var_sites, prev_block, left_window, curr_block_cov, n_blocks, curr_block_sum, rg_min_ident_var, rg_var_effect );
+							}
+
+						}
+						else{
+//							cout<<"rc_call 3"<<endl;
+							recomb_block(rg_window_size_var, curr_sum_var, n_var_sites, prev_block, left_window, curr_block_cov, n_blocks, curr_block_sum, rg_min_ident_var, rg_var_effect );
+						}
+					}
+					curr_block_cov++;
+					n_var_sites++;
+				}
+			}
+	
+			//test if both sequences are identical
+			if(n_var_sites>0){
+				//finish looping window_end_it
+				while(window_end_it<n_var_sites && position_array[recomb_left_positions_var[window_end_it]]+(rg_window_size_var/2)<genome_size){
+					curr_block=position_array[recomb_left_positions_var[window_end_it]]+(rg_window_size_var/2);
+					//continue here			
+					if(prev_block<curr_block){
+//						cout<<"rc_call 4"<<endl;
+						recomb_block(rg_window_size_var, curr_sum_var, n_var_sites, prev_block, curr_block, curr_block_cov, n_blocks, curr_block_sum, rg_min_ident_var, rg_var_effect );
+					}
+					window_end_it++;
+					curr_block_cov--;
+				}
+				//finish looping over var_sites
+				int prev_position=prev_block;
+				while(curr_sum_var<n_var_sites){
+//					cout<<"\t6 Adding block prob. Begin: "<<prev_position+1<<", End: "<<position_array[recomb_left_positions_var[curr_sum_var]]<<", Cov: "<<curr_block_cov<<endl;
+						/*
+					if(position_array[recomb_left_positions_var[curr_sum_var]]>prev_position && (double(curr_block_cov)/double(position_array[recomb_left_positions_var[curr_sum_var]]-prev_block))<1-rg_min_ident_var){
+						add_block=(position_array[recomb_left_positions_var[curr_sum_var]]-prev_position-(rg_var_effect*(curr_block_cov/double(position_array[recomb_left_positions_var[curr_sum_var]]-prev_position))))/genome_size;
+						if(add_block<0){
+							add_block=0;
+						}
+						curr_block_sum+=add_block;
+					}
+						*/
+						curr_block_sum+=determine_block_rec_prob(position_array[recomb_left_positions_var[curr_sum_var]]-prev_position+1  , curr_block_cov, rg_window_size_var, rg_min_ident_var, rg_var_effect );
+
+					/*
+					if(recomb_probs_var.size()>curr_sum_var){
+						recomb_probs_var[curr_sum_var]=curr_block_sum;
+					}
+					else{
+						recomb_probs_var.emplace_back(curr_block_sum);
+					}
+					*/
+					recomb_probs_var.emplace_back(curr_block_sum);
+					prev_position=position_array[recomb_left_positions_var[curr_sum_var]];
+					curr_block_sum=0;
+					curr_sum_var++;
+				}
+		
+				//Add final Block...
+				if(prev_block<genome_size-1){
+					if(prev_block<position_array[recomb_left_positions_var[n_var_sites-1]]){
+//						cout<<"\t7 Adding block prob. Begin: "<<position_array[recomb_left_positions_var[n_var_sites-1]]+1<<", End: "<<genome_size-1<<", Cov: "<<curr_block_cov<<endl;
+						/*
+						if((double(curr_block_cov)/double(genome_size-1-position_array[recomb_left_positions_var[n_var_sites-1]]))<1-rg_min_ident_var){
+							add_block=(genome_size-1-position_array[recomb_left_positions_var[n_var_sites-1]]-(rg_var_effect*(curr_block_cov/double(genome_size-1-position_array[recomb_left_positions_var[n_var_sites-1]]))))/genome_size;
+							if(add_block<0){
+								add_block=0;
+							}
+							curr_block_sum+=add_block;
+						}
+							*/
+							curr_block_sum+=determine_block_rec_prob(genome_size-position_array[recomb_left_positions_var[n_var_sites-1]], curr_block_cov, rg_window_size_var, rg_min_ident_var, rg_var_effect );
+
+					}
+					else{
+//						cout<<"\t8 Adding block prob. Begin: "<<prev_block<<", End: "<<genome_size-1<<", Cov: "<<curr_block_cov<<endl;
+						/*
+						if((double(curr_block_cov)/double(genome_size-1-prev_block))<1-rg_min_ident_var){
+							add_block=(genome_size-1-prev_block-(rg_var_effect*double(curr_block_cov/(genome_size-1-prev_block))))/genome_size;
+							if(add_block<0){
+								add_block=0;
+							}
+							curr_block_sum+=add_block;
+						}
+						*/
+						curr_block_sum+=determine_block_rec_prob(genome_size-1-prev_block, curr_block_cov, rg_window_size_var, rg_min_ident_var, rg_var_effect );
+
+					}
+					/*
+					if(recomb_probs_var.size()>curr_sum_var){
+						recomb_probs_var[curr_sum_var]=curr_block_sum;
+					}
+					else{
+						recomb_probs_var.emplace_back(curr_block_sum);
+					}
+					*/
+					recomb_probs_var.emplace_back(curr_block_sum);
+			
+				}
+				/*
+				//cut back prob vector
+				while(recomb_probs_var.size()>n_var_sites+1){
+					recomb_probs_var.pop_back();
+				}
+				*/
+				//add genomic probability to last window
+				recomb_probs_var.back()+=genome_rec_prob;
+
+/*
+				double total_prob=0;
+				for(int i_rpv=0; i_rpv<recomb_probs_var.size(); i_rpv++){
+					cout<<recomb_probs_var[i_rpv]<<" ";
+					total_prob+=recomb_probs_var[i_rpv];
+				}
+				cout<<", Prob sum: "<<total_prob<<endl;
+				assert(total_prob<=genome_rec_prob+1);
+				//make weighted draw
+				cout<<"Making weighted draw. Prob vector size: "<<recomb_probs_var.size()<<",N var sites: "<<n_var_sites<<", recomb_left_positions_var size: "<<recomb_left_positions_var.size()<<endl;
+*/
+				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
+				
+				//check if position is outside the simulated region or at the beginning or at the end 
+				if(rc_p_index==recomb_probs_var.size()-1 || rc_p_index==0 ){
+					//make non recombinant gamete
+					if(draw_unii(0,1, rc_randgen_var)==0){
+						non_recombined_gamete(ind_array_pos_var.first);
+					}
+					else{
+						non_recombined_gamete(ind_array_pos_var.second);
+					}
+				}
+				//otherwise make recombinant gametes...
+				else{				
+					recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
+				}
+			}
+			else{
+				//make non-recombinant gamete
+				non_recombined_gamete(ind_array_pos_var.first);
+			}
+/*
+//----------------------Begin old rec var function-------------------------------------------------------------------------------------------------------
 			if(recomb_left_positions_var.size()==0){
 				recomb_left_positions_var.emplace_back(-1);	
 			}
@@ -229,23 +534,6 @@ class genotype_matrix{
 					recomb_probs_var.pop_back();
 				}
 				//print rec prob vector
-				/*
-				cout<<"Made rec prob vector."<<endl;
-				double rec_prob_sum=0;
-				for(int i_v_pp=0; i_v_pp<recomb_probs_var.size(); i_v_pp++){
-					cout<<recomb_probs_var[i_v_pp]<<";";
-					rec_prob_sum+=recomb_probs_var[i_v_pp];
-				}
-
-				cout<<endl;
-				cout<<"Recprob sum: "<<rec_prob_sum<<",N recprobs:"<<recomb_probs_var.size()<<endl;
-				for(int i_v_ps=0; i_v_ps<recomb_left_positions_var.size(); i_v_ps++){
-					cout<<recomb_left_positions_var[i_v_ps]<<";";
-				}
-				cout<<endl;
-				cout<<"N recsites: "<<recomb_left_positions_var.size()<<endl;
-
-				*/
 				//
 				//TODO: iterate over recomb_probs_var and reduce rec probs for each block			
 				for(int i_rc_red=0; i_rc_red<recomb_probs_var.size(); i_rc_red++){
@@ -320,7 +608,34 @@ class genotype_matrix{
 
 				}
 				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
-				if(rc_p_index==recomb_left_positions_var.front() || rc_p_index==recomb_left_positions_var.back()){
+
+
+				
+				//get information here!
+				if(record_rec_position==true){
+					if(rc_p_index==0){
+						//wrong!!!
+						if(recomb_left_positions_var.size()>1){
+							rec_position_record=position_array[recomb_left_positions_var[1]]/2;
+						}
+						else{
+							rec_position_record=genome_size/2;
+						}
+					}
+					else if(rc_p_index==recomb_left_positions_var.back()){
+						rec_position_record=(genome_size+position_array[recomb_left_positions_var.back()])/2;
+					}
+					else{
+						rec_position_record=(position_array[recomb_left_positions_var[rc_p_index]]+position_array[recomb_left_positions_var[rc_p_index+1]])/2;
+					}
+
+				}
+
+
+
+
+
+				if(rc_p_index==0 || rc_p_index==recomb_left_positions_var.back()){
 					if(draw_unii(0,1, rc_randgen_var)==0){
 						non_recombined_gamete(ind_array_pos_var.first);
 					}
@@ -330,36 +645,19 @@ class genotype_matrix{
 				}
 				//3. make recombined gamete
 				else{
-					recombined_gamete(rc_p_index, ind_array_pos_var);
+					//shouldn't be rc_p_index!
+					recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
 				}
-			
 			}
-		/*
-				//print rec prob vector
-				cout<<"Change rec probs:"<<endl;
-				rec_prob_sum=0;
-				for(int i_v_pp=0; i_v_pp<recomb_probs_var.size(); i_v_pp++){
-					cout<<recomb_probs_var[i_v_pp]<<";";
-					rec_prob_sum+=recomb_probs_var[i_v_pp];
-				}
-				cout<<endl;
-				*/
-
-
+			
 			//if both sequences are identical
 			else{
 					non_recombined_gamete(ind_array_pos_var.first);
 			}
 
 		}
-		else{
-				if(draw_unii(0,1, rc_randgen_var)==0){
-					non_recombined_gamete(ind_array_pos_var.first);
-				}
-				else{
-					non_recombined_gamete(ind_array_pos_var.second);
-				}
-		}
+		//----------------------------------End old rec var function
+		*/
 	}
 
 
@@ -659,9 +957,9 @@ class genotype_matrix{
 		}
 		left_array_position++;
 		int sdr_size=position_array[right_array_position]-position_array[left_array_position];
-		sdr_file<<"SDR size:"<<sdr_size<<endl;
+		sdr_file<<sdr_size<<endl;
 	}
-	
+/*	
 	void write_rec_probs(){
 		//estimate mean for each window
 		vector <double> rp_mean(mean_rec_prob_vector.size(), 0);				
@@ -673,6 +971,7 @@ class genotype_matrix{
 		mean_rec_prob_vector.assign(mean_rec_prob_vector.size(),0);
 		mean_rec_prob_vector_counter=0;
 	}	
+*/
 	//m/f FST
 	void write_window_fst(int fst_window_size, vector <int> *fst_m_pointer, vector <int> *fst_f_pointer, const int &fst_gen, ostream &fst_outfile){
 		//make vector of windows
@@ -684,76 +983,69 @@ class genotype_matrix{
 		fst_outfile<<fst_gen<<"\t"<<position_array.size();
 		
 
-		int curr_window_start=0;
 		int curr_window_end=fst_window_size;
-		int fst_window_counter=0;
-		int curr_window_sites=0;
-		double curr_window_fst=0;
-		for(int i_fst=0; i_fst<position_array.size(); i_fst++){
-			int n_m=fst_m_pointer->size();
-			int n_f=fst_f_pointer->size();
-			//iterate over males
-			int m_all_count=0;			
-			for(int i_m_a=0; i_m_a<n_m; i_m_a++){
-				if((*ga_pointer)[((*fst_m_pointer)[i_m_a]*x_size)+i_fst]=='1'){
-					m_all_count++;
-				}
-				if((*ga_pointer)[(((*fst_m_pointer)[i_m_a]+1)*x_size)+i_fst]=='1'){
-					m_all_count++;
-				}
-			}
-			double m_a_freq=double(m_all_count)/(2*n_m);		
+		int curr_window_begin=0;
+		int i_fst=0;
+		int curr_fst_pos=position_array[0];
+		//iterate over windows instead
+		for(int i_fst_wind=0; i_fst_wind<n_windows; i_fst_wind++){
+			double curr_window_fst=0;
+			int curr_window_sites=0;
 
-			double Hm=1-((m_a_freq*m_a_freq)+((1-m_a_freq)*(1-m_a_freq)));
-			//iterate over females
-			int f_all_count=0;
-			for(int i_f_a=0; i_f_a<n_f; i_f_a++){
-				if((*ga_pointer)[((*fst_f_pointer)[i_f_a]*x_size)+i_fst]=='1'){
-					f_all_count++;
+			while(curr_fst_pos<curr_window_end && curr_fst_pos>=curr_window_begin && i_fst<position_array.size()){
+				int n_m=fst_m_pointer->size();
+				int n_f=fst_f_pointer->size();
+				//iterate over males
+				int m_all_count=0;			
+				for(int i_m_a=0; i_m_a<n_m; i_m_a++){
+					if((*ga_pointer)[((*fst_m_pointer)[i_m_a]*x_size)+i_fst]=='1'){
+						m_all_count++;
+					}
+					if((*ga_pointer)[(((*fst_m_pointer)[i_m_a]+1)*x_size)+i_fst]=='1'){
+						m_all_count++;
+					}
 				}
-				if((*ga_pointer)[(((*fst_f_pointer)[i_f_a]+1)*x_size)+i_fst]=='1'){
-					f_all_count++;
+				double m_a_freq=double(m_all_count)/(2*n_m);		
+
+				double Hm=1-((m_a_freq*m_a_freq)+((1-m_a_freq)*(1-m_a_freq)));
+				//iterate over females
+				int f_all_count=0;
+				for(int i_f_a=0; i_f_a<n_f; i_f_a++){
+					if((*ga_pointer)[((*fst_f_pointer)[i_f_a]*x_size)+i_fst]=='1'){
+						f_all_count++;
+					}
+					if((*ga_pointer)[(((*fst_f_pointer)[i_f_a]+1)*x_size)+i_fst]=='1'){
+						f_all_count++;
+					}
 				}
-			}
-			double f_a_freq=double(f_all_count)/(2*n_f);		
-			double Hf=1-((f_a_freq*f_a_freq)+((1-f_a_freq)*(1-f_a_freq)));
-			//estimate expected heterozygosity over all samples
-			double comb_a_freq=double(f_all_count+m_all_count)/(2*(n_f+n_m));
-			double HT=1-((comb_a_freq*comb_a_freq)+((1-comb_a_freq)*(1-comb_a_freq)));
-			double site_fst=(HT-((n_m*Hm)+(n_f*Hf))/(n_m+n_f))/HT;
-			if(position_array[i_fst]<curr_window_end){
+				double f_a_freq=double(f_all_count)/(2*n_f);		
+				double Hf=1-((f_a_freq*f_a_freq)+((1-f_a_freq)*(1-f_a_freq)));
+				//estimate expected heterozygosity over all samples
+				double comb_a_freq=double(f_all_count+m_all_count)/(2*(n_f+n_m));
+				double HT=1-((comb_a_freq*comb_a_freq)+((1-comb_a_freq)*(1-comb_a_freq)));
+				double site_fst=(HT-((n_m*Hm)+(n_f*Hf))/(n_m+n_f))/HT;
+					
 				curr_window_fst+=site_fst;
 				curr_window_sites++;
+				i_fst++;
+				curr_fst_pos=position_array[i_fst];
 			}
-			else{	
-				curr_window_start=curr_window_end;
-				curr_window_end+=fst_window_size;
-				if(curr_window_sites>0){
-				//	fst_per_window[fst_window_counter]=curr_window_fst/curr_window_sites;
-					fst_outfile<<"\t"<<curr_window_fst/double(curr_window_sites);
-				}
-				else{
-				//	fst_per_window[fst_window_counter]=0;
-					fst_outfile<<"\tNA";
-				}
-				curr_window_fst=0;
-				curr_window_sites=0;
-				fst_window_counter++;
-				i_fst--;
+			if(curr_window_sites>0){
+			//	fst_per_window[fst_window_counter]=curr_window_fst/curr_window_sites;
+				fst_outfile<<"\t"<<curr_window_fst/double(curr_window_sites);
 			}
+			else{
+			//	fst_per_window[fst_window_counter]=0;
+				fst_outfile<<"\tNA";
+			}
+			curr_window_begin=curr_window_end;
+			curr_window_end+=fst_window_size;
 		}
-		//write last window
-		if(curr_window_sites>0){
-			//fst_per_window[fst_window_counter]=curr_window_fst/curr_window_sites;
-			fst_outfile<<"\t"<<curr_window_fst/double(curr_window_sites)<<endl;
-		}
-		else{
-			//fst_per_window[fst_window_counter]=0;
-			fst_outfile<<"\t"<<"NA"<<endl;
-		}
+		fst_outfile<<endl;
 	}
 	void write_window_dxy(int dxy_window_size, vector <int> *dxx_f_pointer, vector <int> *dxy_m_pointer, ostream &dxx_outfile, ostream &dxy_outfile, int dxy_gen){
 		int curr_window_end=dxy_window_size;
+		int curr_window_begin=0;
 		int n_windows=genome_size/dxy_window_size;
 		dxy_outfile<<dxy_gen;
 		dxx_outfile<<dxy_gen;
@@ -762,8 +1054,18 @@ class genotype_matrix{
 		for(int i_dxy_window=0; i_dxy_window<n_windows; i_dxy_window++){
 			double curr_window_dxy=0;
 			double curr_window_dxx=0;
-			while(position_array[dxy_pos_array_count]<curr_window_end){
-		
+			while(position_array[dxy_pos_array_count]<curr_window_end && position_array[dxy_pos_array_count]>=curr_window_begin && dxy_pos_array_count<position_array.size()){
+				/*
+				int local_window_size;
+
+				if(curr_window_end<=genome_size){
+					local_window_size=dxy_window_size;
+				}
+				else{
+					local_window_size=curr_window_end-genome_size;
+				}
+				*/
+
 				//iterate over males
 				for(int i_dxy_m=0; i_dxy_m<dxy_m_pointer->size(); i_dxy_m++){
 					if( (*ga_pointer)[ ((*dxy_m_pointer)[i_dxy_m]*x_size)+dxy_pos_array_count]!= (*ga_pointer)[(((*dxy_m_pointer)[i_dxy_m]+1)*x_size)+dxy_pos_array_count] ){
@@ -780,6 +1082,7 @@ class genotype_matrix{
 			}
 			dxy_outfile<<"\t"<<curr_window_dxy;
 			dxx_outfile<<"\t"<<curr_window_dxx;
+			curr_window_begin=curr_window_end;
 			curr_window_end+=dxy_window_size;
 		}
 		dxy_outfile<<endl;
@@ -787,6 +1090,8 @@ class genotype_matrix{
 	}
 
 	private:
+		
+
 		//fill the temp array by overwriting existing genotypes and only change the size when we go past the end and in the second step, when mutations are added and fixed sites are removed!
 		void recombined_gamete(int ga_rec_pos_left, pair <int, int> &seq1seq2ids){
 		//	cout<<"Adding rec gamete"<<endl;
@@ -812,11 +1117,12 @@ class genotype_matrix{
 		//	cout<<"Done adding rec gamete"<<endl;
 		}
 		void non_recombined_gamete(int seq_id){
-			//cout<<"Adding nonrec gamete! ta_vector size: "<<ta_pointer->size()<<", temp_last_position: "<<temp_last_position<<endl;
+	//		cout<<"Adding nonrec gamete! ta_vector size: "<<ta_pointer->size()<<", temp_last_position: "<<temp_last_position<<endl;
+	
 			int seq_start_position=seq_id*x_size;
 			while(ta_pointer->size()<temp_last_position+x_size){
 				ta_pointer->emplace_back('0');
-			//	cout<<"Emplacing zero to temp vector, new temp vector size: "<<ta_pointer->size()<<endl;
+	//			cout<<"Emplacing zero to temp vector, new temp vector size: "<<ta_pointer->size()<<endl;
 			}
 
 
@@ -827,6 +1133,7 @@ class genotype_matrix{
 			//	cout<<"Temp last position: "<<temp_last_position<<endl;
 			}
 			temp_x_size=x_size;
+	//		cout<<"Added nonrec gamete..."<<endl;
 		}
 		//here position is position in temp array!
 		void add_site(int position, int seq_ID){
@@ -870,6 +1177,9 @@ class population{
 	vector <int> *f_pointer;
 	vector <int> *tm_pointer;
 	vector <int> *tf_pointer;
+
+	vector <int> m_rec_probs;
+	vector <int> f_rec_probs;
 	public:
 	population(vector <char> &initial_sexes){
 		for(int i_sex=0; i_sex<initial_sexes.size(); i_sex++){
@@ -920,7 +1230,15 @@ class population{
 
 	//rec mode: 0 -> total rec probs at all sites, 1 -> rec probs in blocks between variable sites, 3 -> random
 
-	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_m_rec_prob, double &og_f_rec_prob ){
+	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_rec_prob, bool record_mf_rec_probs, const double &og_var_effect ){
+		//empty record_probs
+		if(record_mf_rec_probs==true){
+			m_rec_probs.clear();
+			f_rec_probs.clear();
+		}	
+
+
+
 		//cout<<"Making offspring gen.."<<endl;
 		//cout<<"Making offspring gen, n_males="<<n_males<<",n_females="<<n_females<<endl;
 		//iterate over individuals in regular ind array...
@@ -961,8 +1279,17 @@ class population{
 				gen_matrix.add_recombined_gamete(m_gamete, og_window_size, og_min_ident, o_randgen);
 			}
 			else if(rec_mode==1){
-				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, o_randgen, og_f_rec_prob);	
-				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, o_randgen, og_m_rec_prob);	
+	//			int male_rec_prob;
+	//			int female_rec_prob;
+
+				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, og_var_effect,  o_randgen, og_rec_prob);	
+				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob);	
+			/*
+				if(record_mf_rec_probs==true){
+					m_rec_probs.push_back(male_rec_prob);
+					f_rec_probs.push_back(female_rec_prob);
+				}
+			*/			
 			}
 			else if(rec_mode==2){
 				gen_matrix.add_recombined_gamete_random(f_gamete, o_randgen);	
@@ -1020,7 +1347,9 @@ class population{
 		while(tf_pointer->size()>n_temp_females){
 			tf_pointer->pop_back();
 		}	
-		
+				
+
+	
 		//cout<<"Done adding offspring to temp array..."<<endl;
 		//also swap m/f temp and regular arrays...
 		swap(m_pointer, tm_pointer);
@@ -1046,10 +1375,23 @@ class population{
 	vector <int> *return_temp_female_pointer(){
 		return tf_pointer;
 	}
-
+	void write_rec_probs(ofstream &m_rc_ofile, ofstream &f_rc_ofile, int rc_gen){
+	//write female rec_points
+		m_rc_ofile<<rc_gen<<"\t";
+		for(int i_m_rp=0; i_m_rp<m_rec_probs.size(); i_m_rp++){
+			m_rc_ofile<<m_rec_probs[i_m_rp]<<" ";
+		}
+		m_rc_ofile<<endl;
+	//write male rec_points
+		f_rc_ofile<<rc_gen<<"\t";
+		for(int i_f_rp=0; i_f_rp<f_rec_probs.size(); i_f_rp++){
+			f_rc_ofile<<f_rec_probs[i_f_rp]<<" ";
+		}
+		f_rc_ofile<<endl;
+	}
 };
 
-void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_m_rec_prob, double &c_f_rec_prob){
+void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_rec_prob, double &c_var_effect, string &c_m_rp_ofile, string &c_f_rp_ofile, string &c_sdr_ofile){
 	ifstream config_file;
 	config_file.open(cfg_file_name);
 	string gc_line;
@@ -1073,11 +1415,11 @@ void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_g
 			else if(param=="mut_mb"){
 				config_option>>c_mr_male_bias;
 			}
-			else if(param=="m_rec_prob"){
-				config_option>>c_m_rec_prob;
+			else if(param=="rec_prob"){
+				config_option>>c_rec_prob;
 			}
-			else if(param=="f_rec_prob"){
-				config_option>>c_f_rec_prob;
+			else if(param=="var_effect"){
+				config_option>>c_var_effect;
 			}
 			else if(param=="sd_pos"){
 				config_option>>c_sd_pos;
@@ -1103,6 +1445,15 @@ void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_g
 			else if(param=="dxx_ofile"){
 				config_option>>c_dxx_ofile;
 			}
+			else if(param=="m_rp_ofile"){
+				config_option>>c_m_rp_ofile;
+			}
+			else if(param=="f_rp_ofile"){
+				config_option>>c_f_rp_ofile;
+			}
+			else if(param=="sdr_ofile"){
+				config_option>>c_sdr_ofile;
+			}
 		}
 	}
 }
@@ -1116,7 +1467,7 @@ int main(int argc, char *argv[]){
 	//population size
 	int n_inds=100;
 	//window size for effect of divergence in meiosis
-	int wind_size=10000;
+	int wind_size=1000;
 	//minimum identity to recombination prob of block to 0
 	double min_ident=0.6;
 	//genome size
@@ -1125,10 +1476,10 @@ int main(int argc, char *argv[]){
 	double mutation_rate=2.5e-7;
 	//male bias of mutation rate
 	double mr_male_bias=1;
-	//probability of a single crossing over in male meiosis
-	double m_rec_prob=1;
-	//probability of a single crossing over in female meiosis
-	double f_rec_prob=1;
+	//probability of crossing over landing in the simulated region
+	double rec_prob=1;
+	//relative effect of a single variant on recombination probabilities
+	double var_effect=0;
 	//sd position
 	int sd_loc=50000;
 	//mean window size for summary statistics
@@ -1141,21 +1492,35 @@ int main(int argc, char *argv[]){
 	string dxx_ofile="dxx.out";
 	//dxy sumstat file	
 	string dxy_ofile="dxy.out";
-
+	//male recombination positions file
+	string m_rec_pos_ofile="m_rp.out";
+	//female recombination positions file
+	string f_rec_pos_ofile="f_rp.out";
+	//sdr size ouput file
+	string sdr_ofile="sdr_size.out";
 
 	//read config file
-	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, m_rec_prob, f_rec_prob );
+	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, rec_prob, var_effect, m_rec_pos_ofile, f_rec_pos_ofile, sdr_ofile);
 
 	//open FST sumstat output
 	ofstream fst_out;
 	ofstream dxx_out;
 	ofstream dxy_out;
+//	ofstream m_rp_out;
+//	ofstream f_rp_out;
+	ofstream(sdr_out);
 	dxx_out.open(dxx_ofile);
 	dxy_out.open(dxy_ofile);
 	fst_out.open(fst_ofile);
+//	m_rp_out.open(m_rec_pos_ofile);
+//	f_rp_out.open(f_rec_pos_ofile);
+	sdr_out.open(sdr_ofile);
 	fst_out<<"generation\tN_variants";
 	dxx_out<<"generation";
 	dxy_out<<"generation";
+//	m_rp_out<<"generation\trecombination positions"<<endl;
+//	f_rp_out<<"generation\trecombination positions"<<endl;
+	sdr_out<<"generation\tSDR_size"<<endl;
 	for(int i_fst_h=mean_rp_wind_size; i_fst_h<=gen_size; i_fst_h+=mean_rp_wind_size){
 		fst_out<<"\t"<<i_fst_h;
 		dxx_out<<"\t"<<i_fst_h;
@@ -1177,7 +1542,12 @@ int main(int argc, char *argv[]){
 	genotype_matrix initial_matrix(initial_sex_vector, gen_size, sd_loc, mean_rp_wind_size );
 	population initial_pop(initial_sex_vector);
 	for(int i_gen=0; i_gen<ngens; i_gen++){
-		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, 1, n_inds, m_rec_prob, f_rec_prob );
+		bool o_gen_rec_prob=false;
+		if(i_gen%sum_stat==0){
+			o_gen_rec_prob=true;
+		}
+
+		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, 1, n_inds, rec_prob, o_gen_rec_prob, var_effect );
 //		cout<<"Made offspring..."<<endl;
 		initial_matrix.temp_remove_fixed_sites();
 		initial_matrix.temp_add_mutations(mutation_rate, mr_male_bias, initial_pop.return_temp_female_pointer(), initial_pop.return_temp_male_pointer(), r_generator);
@@ -1187,12 +1557,17 @@ int main(int argc, char *argv[]){
 			cout<<"Generation "<<i_gen<<endl;
 			initial_matrix.write_window_fst(mean_rp_wind_size, initial_pop.return_male_pointer(), initial_pop.return_female_pointer(), i_gen, fst_out);
 			initial_matrix.write_window_dxy(mean_rp_wind_size, initial_pop.return_female_pointer(), initial_pop.return_male_pointer(), dxx_out, dxy_out, i_gen);
-		//	initial_matrix.print_array();
+//			initial_pop.write_rec_probs(m_rp_out,f_rp_out, i_gen);
+			sdr_out<<i_gen<<"\t";
+			initial_matrix.write_size_of_sdr(initial_pop.return_male_pointer(), sdr_out);
+//			initial_matrix.print_position_array();
 		}
 
 	}
 	fst_out.close();
 	dxx_out.close();
 	dxy_out.close();
+//	m_rp_out.close();
+//	f_rp_out.close();
 return 0;
 };
