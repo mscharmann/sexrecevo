@@ -47,17 +47,23 @@ class genotype_matrix{
 	int temp_x_size;
 	int temp_last_position;
 	int genome_size;
-	//
-	int m_rec_prob_window_size;
-	//rec_prob vector:
+	
+	
+	//mean rec_prob vector:
 	vector <double> mean_rec_prob_vector;
-	//count the number of recombination vectors to get the mean of mean_rec_prob_vector
-	int mean_rec_prob_vector_counter=0;
 	//takes vector of sexes of individuals and adds them in this order to the genotype array...
 	//determines left positions in for block var array and recombination probs
 	vector <int> recomb_left_positions_var;		
 	vector <double> recomb_probs_var;
 	vector <int> block_var;	
+	//probability vectors for hotspot model
+	vector <int> hs_rec_sites;
+	vector <double> hs_original_rec_probs_m;
+	vector <double> hs_original_rec_probs_f;
+
+	vector <double> hs_modified_rec_probs;
+	vector <int> hs_left_rec_sites;
+
 	public:
 	genotype_matrix(vector <char> &ind_sexes, int gen_size, int sd_s, int mean_rec_prob_window_size){
 		y_size=ind_sexes.size()*2;
@@ -85,16 +91,43 @@ class genotype_matrix{
 		prob_vector.reserve(gen_size-1);
 		prob_vector.assign(gen_size-1,1);
 		//number of windows in mean rec prob vector
-		m_rec_prob_window_size=mean_rec_prob_window_size;
-		int mean_rec_prob_vector_size=gen_size/mean_rec_prob_window_size;
-		mean_rec_prob_vector.reserve(mean_rec_prob_vector_size);
-		mean_rec_prob_vector.assign(mean_rec_prob_vector_size,0);
+		//int mean_rec_prob_vector_size=gen_size/mean_rec_prob_window_size;
+		//mean_rec_prob_vector.reserve(mean_rec_prob_vector_size);
+		//mean_rec_prob_vector.assign(mean_rec_prob_vector_size,0);
 		recomb_left_positions_var.reserve(10000);
 		recomb_probs_var.reserve(10000);
 	}
 	~genotype_matrix(){
 		ga_pointer=nullptr;
 		ta_pointer=nullptr;
+	}
+	void read_hotspot_conf(string &hs_conf_file){
+		cout<<"Reading hotspot conf"<<endl;
+		ifstream hs_config_file;
+		hs_config_file.open(hs_conf_file);
+		string hs_line;
+		int hs_position;
+		double hs_male_prob;
+		double hs_female_prob;
+		while(getline(hs_config_file, hs_line)){
+			if(hs_line.length()>0 && hs_line[0]!='#'){
+				stringstream hs_config_option(hs_line);
+				hs_config_option>>hs_position;
+				if(hs_position<=genome_size){
+					hs_rec_sites.emplace_back(hs_position);
+					hs_config_option>>hs_male_prob;
+					hs_original_rec_probs_m.emplace_back(hs_male_prob);
+					hs_config_option>>hs_female_prob;
+					hs_original_rec_probs_f.emplace_back(hs_female_prob);
+					hs_modified_rec_probs.emplace_back(hs_female_prob);
+					hs_left_rec_sites.emplace_back(0);
+				}
+				else{
+					cout<<"Warning: recombination site "<<hs_position<<" is larger than the genome size. Ignoring site."<<endl;
+				}
+			}
+		}
+		cout<<"Done reading hotspot.conf. Hotspot vector is "<<hs_original_rec_probs_m.size()<<" long."<<endl;
 	}
 	//adds a single recombined gamete to the temp array, where ind_array.first defines the first and ind_array.second the second individual and left_rec_site the position (in position_array) of the first individual before the breakpoint. Array positions are 0based.
 	void add_recombined_gamete(pair <int, int> ind_array_pos, const int &rg_window_size, const double &rg_min_ident, mt19937 &rc_randgen){
@@ -180,7 +213,10 @@ class genotype_matrix{
 	double determine_block_rec_prob(const int &brp_block_size, const int &brp_block_cov, const int &brp_wind_size, const double &brp_min_identity, const double &brp_var_effect){
 		double brp_rec_prob=0;
 		if(brp_block_size>0 && double(brp_wind_size-brp_block_cov)/brp_wind_size>brp_min_identity && brp_var_effect*brp_block_cov<brp_wind_size){
-			brp_rec_prob=(brp_block_size*(double(brp_wind_size-(brp_var_effect*brp_block_cov))/brp_wind_size))/genome_size;
+			//brp_rec_prob=(brp_block_size*(double(brp_wind_size-(brp_var_effect*brp_block_cov))/brp_wind_size))/genome_size;
+			brp_rec_prob=(brp_block_size*(1-(double(brp_var_effect*brp_block_cov)/brp_wind_size)))/genome_size;
+			//cout<<"Making recombination probability for dynamic model. Prob: "<<brp_rec_prob<<", var_effect: "<<brp_var_effect<<" ,n_variants: "<<brp_block_cov<<", block size: "<<brp_block_size<<", window_size: "<<brp_wind_size<<", genome_size: "<<genome_size<<endl;
+			//TODO: continue here...test var_effect...
 		}
 		return brp_rec_prob;
 	}
@@ -308,7 +344,7 @@ class genotype_matrix{
 	}
 
 
-	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, const double &rg_var_effect, mt19937 &rc_randgen_var, const double &genome_rec_prob){
+	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, const double &rg_var_effect, mt19937 &rc_randgen_var, const double &genome_rec_prob, int &rg_rec_point ){
 			//vector <double> recomb_probs_var;
 			//vector <int> recomb_left_positions_var;
 			int window_end_it=0;
@@ -466,7 +502,7 @@ class genotype_matrix{
 				cout<<"Making weighted draw. Prob vector size: "<<recomb_probs_var.size()<<",N var sites: "<<n_var_sites<<", recomb_left_positions_var size: "<<recomb_left_positions_var.size()<<endl;
 */
 				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
-				
+				rg_rec_point=position_array[recomb_left_positions_var[rc_p_index]];
 				//check if position is outside the simulated region or at the beginning or at the end 
 				if(rc_p_index==recomb_probs_var.size()-1 || rc_p_index==0 ){
 					//make non recombinant gamete
@@ -478,188 +514,107 @@ class genotype_matrix{
 					}
 				}
 				//otherwise make recombinant gametes...
-				else{				
-					recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
+				else{	
+					//I think this was wrong!			
+					//recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
+					recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
 				}
 			}
 			else{
 				//make non-recombinant gamete
 				non_recombined_gamete(ind_array_pos_var.first);
 			}
-/*
-//----------------------Begin old rec var function-------------------------------------------------------------------------------------------------------
-			if(recomb_left_positions_var.size()==0){
-				recomb_left_positions_var.emplace_back(-1);	
-			}
-			else{
-				recomb_left_positions_var[0]=-1;
-			}
-			//cout<<"Adding gamete var sites..."<<endl;
-			//1. determine the number of possible recombination points
-			int rc_points=0;
-			//where does the current block begin
-			int curr_block_begin=0;	
-			for(int i_rc_pos=0; i_rc_pos<position_array.size(); i_rc_pos++){
-				if((*ga_pointer)[(ind_array_pos_var.first*x_size)+i_rc_pos] != (*ga_pointer)[(ind_array_pos_var.second*x_size)+i_rc_pos]){
-	//				cout<<"Position "<<i_rc_pos<<" in Sequence "<<ind_array_pos_var.first<<" and Sequence "<<ind_array_pos_var.second<<" are variable."<<endl;
-					double raw_prob=double(position_array[i_rc_pos])-curr_block_begin;
-					if(recomb_probs_var.size()<rc_points+1){
-						recomb_probs_var.emplace_back(raw_prob);
-					}	
-					else{
-						recomb_probs_var[rc_points]=raw_prob;
-					}
-					curr_block_begin=position_array[i_rc_pos];
-					rc_points++;
-					if(recomb_left_positions_var.size()>rc_points){
-						recomb_left_positions_var[rc_points]=i_rc_pos;
-					}
-					else{
-						recomb_left_positions_var.emplace_back(i_rc_pos);
-					}
-				}
-			}
-			//add probability for last window as well...
-			if(rc_points>0){
-				double last_raw_prob=double(genome_size)-curr_block_begin-1;
-				if(recomb_probs_var.size()<=rc_points){
-					recomb_probs_var.emplace_back(last_raw_prob);
-				}	
-				else{
-					recomb_probs_var[rc_points]=last_raw_prob;
-				}
-				//if necessary shrink both vectors to correct size
-				while(recomb_probs_var.size()>rc_points+1){
-					recomb_left_positions_var.pop_back();
-					recomb_probs_var.pop_back();
-				}
-				//print rec prob vector
-				//
-				//TODO: iterate over recomb_probs_var and reduce rec probs for each block			
-				for(int i_rc_red=0; i_rc_red<recomb_probs_var.size(); i_rc_red++){
-					int block_left;
-					if(recomb_left_positions_var[i_rc_red]!=-1){
-						block_left=position_array[recomb_left_positions_var[i_rc_red]];
-					}
-					else{
-						block_left=0;
-					}
-					int block_right=block_left+int(recomb_probs_var[i_rc_red]);
-					//iterate to left of block
-					if(block_left>0){
-						int l_red_it=i_rc_red;
-						while(recomb_left_positions_var[l_red_it]!=-1 && position_array[recomb_left_positions_var[l_red_it]]>block_left-rg_window_size_var){
-							//cout<<"Found left var site..."<<endl;
-							double l_red;	
-							int l_wind_begin=position_array[recomb_left_positions_var[l_red_it]];
-							//cout<<"L wind begin:"<<l_wind_begin<<endl;
-							int l_wind_end=l_wind_begin+rg_window_size_var;
-							//cout<<"L wind end:"<<l_wind_end<<endl;
-							//calculate reduction based on window size and overlap
-							//if block is smaller than window end reduce proportionate to block size
-							if(l_wind_end>block_right){
-								l_red=recomb_probs_var[i_rc_red]*1/double(rg_window_size_var);	
-							}
-							//otherwise reduce proportionate to overlap with block
-							else{
-								l_red=(l_wind_end-block_left)*1/double(rg_window_size_var);
-							}
-							//cout<<"l_red:"<<l_red<<endl;
-							recomb_probs_var[i_rc_red]-=l_red;
-							l_red_it--;
-						}
-					}
-					//iterate to right of block
-					if(block_right<genome_size){
-						int r_red_it=i_rc_red+1;
-						while(r_red_it<recomb_left_positions_var.size() && position_array[recomb_left_positions_var[r_red_it]]<block_right+rg_window_size_var){
-							//cout<<"Found right var site..."<<endl;
-							double r_red;
-							int r_wind_end=position_array[recomb_left_positions_var[r_red_it]];
-							int r_wind_begin=r_wind_end-rg_window_size_var;
-							if(r_wind_begin<block_left){
-								r_red=recomb_probs_var[i_rc_red]*1/double(rg_window_size_var);
-							}
-							else{
-								r_red=(block_right-r_wind_begin)*1/double(rg_window_size_var);
-							}
-							//cout<<"r_red:"<<r_red<<endl;
-							recomb_probs_var[i_rc_red]-=r_red;
-							r_red_it++;
-						}
-					}
-					//TODO: check if window probs are below minimum threshold
-					double window_min_threshold;
-					//if the block is larger than two times the window it cannot completely be reduced to zero...
-					if(block_right-block_left>2*rg_window_size_var){
-						window_min_threshold=2*rg_window_size_var*double(rg_min_ident_var);
-						if(recomb_probs_var[i_rc_red]<window_min_threshold){
-							recomb_probs_var[i_rc_red]=block_right-block_left-(2*rg_window_size_var);
-						}	
-					}
-					else{
-						window_min_threshold=(block_right-block_left)*double(rg_min_ident_var);
-						if(recomb_probs_var[i_rc_red]<window_min_threshold){
-							recomb_probs_var[i_rc_red]=0;
-						}	
-						
-					}
-
-
-				}
-				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
-
-
-				
-				//get information here!
-				if(record_rec_position==true){
-					if(rc_p_index==0){
-						//wrong!!!
-						if(recomb_left_positions_var.size()>1){
-							rec_position_record=position_array[recomb_left_positions_var[1]]/2;
-						}
-						else{
-							rec_position_record=genome_size/2;
-						}
-					}
-					else if(rc_p_index==recomb_left_positions_var.back()){
-						rec_position_record=(genome_size+position_array[recomb_left_positions_var.back()])/2;
-					}
-					else{
-						rec_position_record=(position_array[recomb_left_positions_var[rc_p_index]]+position_array[recomb_left_positions_var[rc_p_index+1]])/2;
-					}
-
-				}
-
-
-
-
-
-				if(rc_p_index==0 || rc_p_index==recomb_left_positions_var.back()){
-					if(draw_unii(0,1, rc_randgen_var)==0){
-						non_recombined_gamete(ind_array_pos_var.first);
-					}
-					else{
-						non_recombined_gamete(ind_array_pos_var.second);
-					}
-				}
-				//3. make recombined gamete
-				else{
-					//shouldn't be rc_p_index!
-					recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
-				}
-			}
-			
-			//if both sequences are identical
-			else{
-					non_recombined_gamete(ind_array_pos_var.first);
-			}
-
-		}
-		//----------------------------------End old rec var function
-		*/
 	}
-
+	void add_recombined_gamete_hotspot(pair <int, int> ind_array_pos_hs, const int &hs_window_size, const double &hs_min_ident, const double &hs_var_effect, mt19937 &hs_randgen_var, const double &hs_genome_rec_prob, bool hs_male_rec, int &hs_rec_point){
+		int last_rec_pos=0;
+		int curr_rec_pos=0;
+		int hs_left_rec_pos=0;
+		int hs_window_var_site_count=0;
+		bool found_left_rec_pos=false;
+		for(int i_hs_pos=0; i_hs_pos<hs_rec_sites.size(); i_hs_pos++){
+			//advance last_rec_prob until it's within window size
+			while(position_array[last_rec_pos]<hs_rec_sites[i_hs_pos]-hs_window_size && position_array[last_rec_pos+1]<hs_rec_sites[i_hs_pos]+hs_window_size){
+				last_rec_pos++;
+			}
+			//count variable sites in window
+			curr_rec_pos=last_rec_pos;
+			//
+			hs_left_rec_pos=curr_rec_pos;
+			while(position_array[curr_rec_pos]<hs_rec_sites[i_hs_pos]+hs_window_size){
+				//remember where rec spots are...
+				if(position_array[curr_rec_pos]==hs_rec_sites[i_hs_pos]){
+					hs_left_rec_pos=curr_rec_pos;
+				//	cout<<"1: Found left_rec_pos, site: "<<hs_rec_sites[i_hs_pos]<<endl;
+					found_left_rec_pos=true;		
+				} 
+				else if(found_left_rec_pos==false && position_array[curr_rec_pos]>hs_rec_sites[i_hs_pos] && curr_rec_pos>0){
+					hs_left_rec_pos=curr_rec_pos-1;
+				//	cout<<"2: Found left_rec_pos, site: "<<hs_rec_sites[i_hs_pos]<<endl;
+					found_left_rec_pos=true;
+				}
+				if((*ga_pointer)[(ind_array_pos_hs.first*x_size)+curr_rec_pos] != (*ga_pointer)[(ind_array_pos_hs.second*x_size)+curr_rec_pos]){
+					hs_window_var_site_count++;
+				}
+				curr_rec_pos++;
+			}
+			if(found_left_rec_pos==false && position_array[curr_rec_pos]<hs_rec_sites[i_hs_pos])
+			{
+			//	cout<<"3: Found left_rec_pos, site: "<<hs_rec_sites[i_hs_pos]<<endl;
+				hs_left_rec_pos=curr_rec_pos;
+			}
+			hs_left_rec_sites[i_hs_pos]=hs_left_rec_pos;
+			found_left_rec_pos=false;
+			double hs_mod_rec_prob;
+			if(hs_male_rec==true){
+				if(1-(hs_window_var_site_count/hs_window_size)>hs_min_ident){
+					hs_mod_rec_prob=hs_original_rec_probs_m[i_hs_pos]*(1-((hs_var_effect*hs_window_var_site_count)/hs_window_size));
+					//cout<<"Making male recombination probability for hotspot model. Prob: "<<hs_mod_rec_prob<<", var_effect: "<<hs_var_effect<<" ,n_variants: "<<hs_window_var_site_count<<", a priori rec prob: "<<hs_original_rec_probs_m[i_hs_pos]<<", window_size: "<<hs_window_size<<", genome_size: "<<genome_size<<endl;
+				}
+				else{
+					hs_mod_rec_prob=0;
+				}
+			}
+			else{
+				if(1-(hs_window_var_site_count/hs_window_size)>hs_min_ident){
+					hs_mod_rec_prob=hs_original_rec_probs_f[i_hs_pos]*(1-((hs_var_effect*hs_window_var_site_count)/hs_window_size));
+					//cout<<"Making female recombination probability for hotspot model. Prob: "<<hs_mod_rec_prob<<", var_effect: "<<hs_var_effect<<" ,n_variants: "<<hs_window_var_site_count<<", a priori rec prob: "<<hs_original_rec_probs_f[i_hs_pos]<<", window_size: "<<hs_window_size<<", genome_size: "<<genome_size<<endl;
+				}
+				else{
+					hs_mod_rec_prob=0;
+				}
+			}
+			if(hs_mod_rec_prob<0){
+				hs_mod_rec_prob=0;
+			}
+			hs_modified_rec_probs[i_hs_pos]=hs_mod_rec_prob;
+		}
+		//add genome_rec_prob
+		hs_modified_rec_probs.back()+=hs_genome_rec_prob;
+		/*
+		print_position_array();
+		cout<<"Hs vector:"<<endl;
+		for(int i_hs_mod=0; i_hs_mod<hs_modified_rec_probs.size(); i_hs_mod++){
+			cout<<"Site: "<<hs_rec_sites[i_hs_mod]<<" Prob: "<<hs_modified_rec_probs[i_hs_mod]<<" Left_rec_sîte: "<<hs_left_rec_sites[i_hs_mod]<<", In position array: "<<position_array[hs_left_rec_sites[i_hs_mod]]<<endl;
+		}
+		*/
+		//make weighted draw
+		int hs_p_index=make_weighted_draw(hs_modified_rec_probs, hs_randgen_var);
+		hs_rec_point=hs_rec_sites[hs_p_index];
+		//non-recombined gamete
+		if(hs_p_index==hs_modified_rec_probs.size()-1){
+			if(draw_unii(0,1, hs_randgen_var)==0){
+				non_recombined_gamete(ind_array_pos_hs.first);
+			}
+			else{
+				non_recombined_gamete(ind_array_pos_hs.second);
+			}
+		}
+		//recombined gamete
+		else{
+			recombined_gamete(hs_left_rec_sites[hs_p_index], ind_array_pos_hs);
+			
+		}
+	}
 
 	void print_position_array(){
 		cout<<"Position array ("<<position_array.size()<<" bp):"<<endl;
@@ -670,10 +625,16 @@ class genotype_matrix{
 	}
 	//adds mutations to the temp array, operates on position array
 	void temp_add_mutations(double mutation_rate, double male_bias, vector <int> *mut_females, vector <int> *mut_males, mt19937 &am_randgen){
+		int total_number_of_mutations=(mut_males->size()+mut_females->size())*2*genome_size*mutation_rate;
 		//draw total number of mutations in males (use temp female array)
-		int male_muts=mut_males->size()*2*genome_size*mutation_rate*male_bias;
+		int female_muts=total_number_of_mutations*(1/(male_bias+1));
+		int male_muts=total_number_of_mutations-female_muts;
+		
+		
+	
 		//draw total number of mutations in females
-		int female_muts=mut_females->size()*2*genome_size*mutation_rate;
+		//TODO: continue here
+		//cout<<"Total muts: "<<total_number_of_mutations<<",male muts: "<<male_muts<<",female_muts: "<<female_muts<<endl;
 		//draw number of mutations in males and in females (use temp male array)
 		int f_mut_count=0;
 		int m_mut_count=0;
@@ -1178,8 +1139,8 @@ class population{
 	vector <int> *tm_pointer;
 	vector <int> *tf_pointer;
 
-	vector <int> m_rec_probs;
-	vector <int> f_rec_probs;
+	vector <int> m_rec_points;
+	vector <int> f_rec_points;
 	public:
 	population(vector <char> &initial_sexes){
 		for(int i_sex=0; i_sex<initial_sexes.size(); i_sex++){
@@ -1230,11 +1191,11 @@ class population{
 
 	//rec mode: 0 -> total rec probs at all sites, 1 -> rec probs in blocks between variable sites, 3 -> random
 
-	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_rec_prob, bool record_mf_rec_probs, const double &og_var_effect ){
+	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_rec_prob, bool record_mf_rec_points, const double &og_var_effect ){
 		//empty record_probs
-		if(record_mf_rec_probs==true){
-			m_rec_probs.clear();
-			f_rec_probs.clear();
+		if(record_mf_rec_points==true){
+			m_rec_points.clear();
+			f_rec_points.clear();
 		}	
 
 
@@ -1273,28 +1234,40 @@ class population{
 				m_gamete=make_pair((*m_pointer)[o_father]+1, (*m_pointer)[o_father]);
 
 			}
+			int male_rec_point=0;
+			int female_rec_point=0;
 
 			if(rec_mode==0){
 				gen_matrix.add_recombined_gamete(f_gamete, og_window_size, og_min_ident, o_randgen);
 				gen_matrix.add_recombined_gamete(m_gamete, og_window_size, og_min_ident, o_randgen);
 			}
 			else if(rec_mode==1){
-	//			int male_rec_prob;
-	//			int female_rec_prob;
 
-				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, og_var_effect,  o_randgen, og_rec_prob);	
-				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob);	
-			/*
-				if(record_mf_rec_probs==true){
-					m_rec_probs.push_back(male_rec_prob);
-					f_rec_probs.push_back(female_rec_prob);
+				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, og_var_effect,  o_randgen, og_rec_prob, female_rec_point);	
+				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, male_rec_point);	
+			
+				if(record_mf_rec_points==true){
+					m_rec_points.push_back(male_rec_point);
+					f_rec_points.push_back(female_rec_point);
 				}
-			*/			
+						
 			}
 			else if(rec_mode==2){
 				gen_matrix.add_recombined_gamete_random(f_gamete, o_randgen);	
 				gen_matrix.add_recombined_gamete_random(m_gamete, o_randgen);	
 			}
+
+			else if(rec_mode==3){
+				gen_matrix.add_recombined_gamete_hotspot(f_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, false, female_rec_point);
+				gen_matrix.add_recombined_gamete_hotspot(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, true, male_rec_point);
+				if(record_mf_rec_points==true){
+					m_rec_points.push_back(male_rec_point);
+					f_rec_points.push_back(female_rec_point);
+				}
+			}
+
+
+
 		//	gen_matrix.print_temp_array();
 		//	gen_matrix.print_position_array();
 			//draw father
@@ -1375,23 +1348,26 @@ class population{
 	vector <int> *return_temp_female_pointer(){
 		return tf_pointer;
 	}
-	void write_rec_probs(ofstream &m_rc_ofile, ofstream &f_rc_ofile, int rc_gen){
-	//write female rec_points
-		m_rc_ofile<<rc_gen<<"\t";
-		for(int i_m_rp=0; i_m_rp<m_rec_probs.size(); i_m_rp++){
-			m_rc_ofile<<m_rec_probs[i_m_rp]<<" ";
+	void write_rec_points(ofstream &m_rc_ofile, ofstream &f_rc_ofile, int rc_gen){
+		//don't write generation 0, because it's confusing
+		if(rc_gen!=0){
+		//write female rec_points
+			m_rc_ofile<<rc_gen<<"\t";
+			for(int i_m_rp=0; i_m_rp<m_rec_points.size(); i_m_rp++){
+				m_rc_ofile<<m_rec_points[i_m_rp]<<" ";
+			}
+			m_rc_ofile<<endl;
+		//write male rec_points
+			f_rc_ofile<<rc_gen<<"\t";
+			for(int i_f_rp=0; i_f_rp<f_rec_points.size(); i_f_rp++){
+				f_rc_ofile<<f_rec_points[i_f_rp]<<" ";
+			}
+			f_rc_ofile<<endl;
 		}
-		m_rc_ofile<<endl;
-	//write male rec_points
-		f_rc_ofile<<rc_gen<<"\t";
-		for(int i_f_rp=0; i_f_rp<f_rec_probs.size(); i_f_rp++){
-			f_rc_ofile<<f_rec_probs[i_f_rp]<<" ";
-		}
-		f_rc_ofile<<endl;
 	}
 };
 
-void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_rec_prob, double &c_var_effect, string &c_m_rp_ofile, string &c_f_rp_ofile, string &c_sdr_ofile){
+void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_rec_prob, double &c_var_effect, string &c_m_rp_ofile, string &c_f_rp_ofile, string &c_sdr_ofile, string &c_hs_conf_file){
 	ifstream config_file;
 	config_file.open(cfg_file_name);
 	string gc_line;
@@ -1454,6 +1430,9 @@ void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_g
 			else if(param=="sdr_ofile"){
 				config_option>>c_sdr_ofile;
 			}
+			else if(param=="hotspot_conf"){
+				config_option>>c_hs_conf_file;
+			}
 		}
 	}
 }
@@ -1498,29 +1477,35 @@ int main(int argc, char *argv[]){
 	string f_rec_pos_ofile="f_rp.out";
 	//sdr size ouput file
 	string sdr_ofile="sdr_size.out";
+	//name of the hotspot configuration file	
+	string hotspot_conf_file="";
+
+
+	//run mode: 1=dynamic model(standard), 2=random recombination events, 3=hotspot model
+	int run_mode=1;
 
 	//read config file
-	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, rec_prob, var_effect, m_rec_pos_ofile, f_rec_pos_ofile, sdr_ofile);
+	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, rec_prob, var_effect, m_rec_pos_ofile, f_rec_pos_ofile, sdr_ofile, hotspot_conf_file);
 
 	//open FST sumstat output
 	ofstream fst_out;
 	ofstream dxx_out;
 	ofstream dxy_out;
-//	ofstream m_rp_out;
-//	ofstream f_rp_out;
-	ofstream(sdr_out);
+	ofstream m_rp_out;
+	ofstream f_rp_out;
+	//ofstream(sdr_out);
 	dxx_out.open(dxx_ofile);
 	dxy_out.open(dxy_ofile);
 	fst_out.open(fst_ofile);
-//	m_rp_out.open(m_rec_pos_ofile);
-//	f_rp_out.open(f_rec_pos_ofile);
-	sdr_out.open(sdr_ofile);
+	m_rp_out.open(m_rec_pos_ofile);
+	f_rp_out.open(f_rec_pos_ofile);
+	//sdr_out.open(sdr_ofile);
 	fst_out<<"generation\tN_variants";
 	dxx_out<<"generation";
 	dxy_out<<"generation";
-//	m_rp_out<<"generation\trecombination positions"<<endl;
-//	f_rp_out<<"generation\trecombination positions"<<endl;
-	sdr_out<<"generation\tSDR_size"<<endl;
+	m_rp_out<<"generation\trecombination positions"<<endl;
+	f_rp_out<<"generation\trecombination positions"<<endl;
+	//sdr_out<<"generation\tSDR_size"<<endl;
 	for(int i_fst_h=mean_rp_wind_size; i_fst_h<=gen_size; i_fst_h+=mean_rp_wind_size){
 		fst_out<<"\t"<<i_fst_h;
 		dxx_out<<"\t"<<i_fst_h;
@@ -1540,6 +1525,10 @@ int main(int argc, char *argv[]){
 		initial_sex_vector.emplace_back('m');
 	}
 	genotype_matrix initial_matrix(initial_sex_vector, gen_size, sd_loc, mean_rp_wind_size );
+	if(hotspot_conf_file!=""){
+		run_mode=3;
+		initial_matrix.read_hotspot_conf(hotspot_conf_file);
+	}
 	population initial_pop(initial_sex_vector);
 	for(int i_gen=0; i_gen<ngens; i_gen++){
 		bool o_gen_rec_prob=false;
@@ -1547,7 +1536,7 @@ int main(int argc, char *argv[]){
 			o_gen_rec_prob=true;
 		}
 
-		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, 1, n_inds, rec_prob, o_gen_rec_prob, var_effect );
+		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, run_mode, n_inds, rec_prob, o_gen_rec_prob, var_effect );
 //		cout<<"Made offspring..."<<endl;
 		initial_matrix.temp_remove_fixed_sites();
 		initial_matrix.temp_add_mutations(mutation_rate, mr_male_bias, initial_pop.return_temp_female_pointer(), initial_pop.return_temp_male_pointer(), r_generator);
@@ -1557,9 +1546,9 @@ int main(int argc, char *argv[]){
 			cout<<"Generation "<<i_gen<<endl;
 			initial_matrix.write_window_fst(mean_rp_wind_size, initial_pop.return_male_pointer(), initial_pop.return_female_pointer(), i_gen, fst_out);
 			initial_matrix.write_window_dxy(mean_rp_wind_size, initial_pop.return_female_pointer(), initial_pop.return_male_pointer(), dxx_out, dxy_out, i_gen);
-//			initial_pop.write_rec_probs(m_rp_out,f_rp_out, i_gen);
-			sdr_out<<i_gen<<"\t";
-			initial_matrix.write_size_of_sdr(initial_pop.return_male_pointer(), sdr_out);
+			initial_pop.write_rec_points(m_rp_out,f_rp_out, i_gen);
+			//sdr_out<<i_gen<<"\t";
+			//initial_matrix.write_size_of_sdr(initial_pop.return_male_pointer(), sdr_out);
 //			initial_matrix.print_position_array();
 		}
 
@@ -1567,7 +1556,7 @@ int main(int argc, char *argv[]){
 	fst_out.close();
 	dxx_out.close();
 	dxy_out.close();
-//	m_rp_out.close();
-//	f_rp_out.close();
+	m_rp_out.close();
+	f_rp_out.close();
 return 0;
 };
