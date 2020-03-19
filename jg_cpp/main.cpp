@@ -127,6 +127,8 @@ class genotype_matrix{
 				}
 			}
 		}
+		//add prob for unsimulated region
+		hs_modified_rec_probs.emplace_back(0);
 		cout<<"Done reading hotspot.conf. Hotspot vector is "<<hs_original_rec_probs_m.size()<<" long."<<endl;
 	}
 	//adds a single recombined gamete to the temp array, where ind_array.first defines the first and ind_array.second the second individual and left_rec_site the position (in position_array) of the first individual before the breakpoint. Array positions are 0based.
@@ -488,8 +490,8 @@ class genotype_matrix{
 				}
 				*/
 				//add genomic probability to last window
-				recomb_probs_var.back()+=genome_rec_prob;
-
+				//recomb_probs_var.back()+=genome_rec_prob;
+				recomb_probs_var.emplace_back(genome_rec_prob);
 /*
 				double total_prob=0;
 				for(int i_rpv=0; i_rpv<recomb_probs_var.size(); i_rpv++){
@@ -502,9 +504,11 @@ class genotype_matrix{
 				cout<<"Making weighted draw. Prob vector size: "<<recomb_probs_var.size()<<",N var sites: "<<n_var_sites<<", recomb_left_positions_var size: "<<recomb_left_positions_var.size()<<endl;
 */
 				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
-				rg_rec_point=position_array[recomb_left_positions_var[rc_p_index]];
+				
+
+
 				//check if position is outside the simulated region or at the beginning or at the end 
-				if(rc_p_index==recomb_probs_var.size()-1 || rc_p_index==0 ){
+				if(rc_p_index>=recomb_probs_var.size()-2 || rc_p_index==0 ){
 					//make non recombinant gamete
 					if(draw_unii(0,1, rc_randgen_var)==0){
 						non_recombined_gamete(ind_array_pos_var.first);
@@ -516,8 +520,16 @@ class genotype_matrix{
 				//otherwise make recombinant gametes...
 				else{	
 					//I think this was wrong!			
-					//recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
-					recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
+					//recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
+					recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
+				}
+				//
+				if(rc_p_index==recomb_probs_var.size()-1){
+					rg_rec_point=genome_size+1;
+				}
+				else{
+				
+					rg_rec_point=position_array[recomb_left_positions_var[rc_p_index]];
 				}
 			}
 			else{
@@ -589,7 +601,7 @@ class genotype_matrix{
 			hs_modified_rec_probs[i_hs_pos]=hs_mod_rec_prob;
 		}
 		//add genome_rec_prob
-		hs_modified_rec_probs.back()+=hs_genome_rec_prob;
+		hs_modified_rec_probs.back()=hs_genome_rec_prob;
 		/*
 		print_position_array();
 		cout<<"Hs vector:"<<endl;
@@ -599,9 +611,14 @@ class genotype_matrix{
 		*/
 		//make weighted draw
 		int hs_p_index=make_weighted_draw(hs_modified_rec_probs, hs_randgen_var);
-		hs_rec_point=hs_rec_sites[hs_p_index];
-		//non-recombined gamete
 		if(hs_p_index==hs_modified_rec_probs.size()-1){
+			hs_rec_point=genome_size+1;
+		}
+		else{
+			hs_rec_point=hs_rec_sites[hs_p_index];
+		}
+		//non-recombined gamete
+		if(hs_p_index>=hs_modified_rec_probs.size()-2){
 			if(draw_unii(0,1, hs_randgen_var)==0){
 				non_recombined_gamete(ind_array_pos_hs.first);
 			}

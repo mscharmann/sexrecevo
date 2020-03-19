@@ -134,7 +134,7 @@ Please not that:
 
 * recombination positions are not exact in the dynamic model, because recombination probabilities are integrated over blocks.
 
-* recombination events that fall outside the simulated region are added to the last window of recombination. However, the exact position of the last recombination window can vary in the dynamic model.
+* recombination events that fall outside the simulated region will be recorded as genome_size+1
 
 The output file includes the generation in the first column and a list of all recombination events in this generation in the second column.
 
