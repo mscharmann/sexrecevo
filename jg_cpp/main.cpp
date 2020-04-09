@@ -545,14 +545,14 @@ class genotype_matrix{
 		bool found_left_rec_pos=false;
 		for(int i_hs_pos=0; i_hs_pos<hs_rec_sites.size(); i_hs_pos++){
 			//advance last_rec_prob until it's within window size
-			while(position_array[last_rec_pos]<hs_rec_sites[i_hs_pos]-hs_window_size && position_array[last_rec_pos+1]<hs_rec_sites[i_hs_pos]+hs_window_size){
+			while(position_array[last_rec_pos]<hs_rec_sites[i_hs_pos]-(hs_window_size/2) && position_array[last_rec_pos+1]<hs_rec_sites[i_hs_pos]+(hs_window_size/2)){
 				last_rec_pos++;
 			}
 			//count variable sites in window
 			curr_rec_pos=last_rec_pos;
 			//
 			hs_left_rec_pos=curr_rec_pos;
-			while(position_array[curr_rec_pos]<hs_rec_sites[i_hs_pos]+hs_window_size){
+			while(position_array[curr_rec_pos]<hs_rec_sites[i_hs_pos]+(hs_window_size/2)){
 				//remember where rec spots are...
 				if(position_array[curr_rec_pos]==hs_rec_sites[i_hs_pos]){
 					hs_left_rec_pos=curr_rec_pos;
@@ -599,6 +599,7 @@ class genotype_matrix{
 				hs_mod_rec_prob=0;
 			}
 			hs_modified_rec_probs[i_hs_pos]=hs_mod_rec_prob;
+			hs_window_var_site_count=0;
 		}
 		//add genome_rec_prob
 		hs_modified_rec_probs.back()=hs_genome_rec_prob;
@@ -617,8 +618,10 @@ class genotype_matrix{
 		else{
 			hs_rec_point=hs_rec_sites[hs_p_index];
 		}
+		//cout<<"hs_index: "<<hs_p_index<<" hs_rec_point: "<<hs_rec_point<<endl;
 		//non-recombined gamete
-		if(hs_p_index>=hs_modified_rec_probs.size()-2){
+		//if(hs_p_index>=hs_modified_rec_probs.size()-2){
+		if(hs_p_index==hs_modified_rec_probs.size()-1){
 			if(draw_unii(0,1, hs_randgen_var)==0){
 				non_recombined_gamete(ind_array_pos_hs.first);
 			}
@@ -1575,5 +1578,5 @@ int main(int argc, char *argv[]){
 	dxy_out.close();
 	m_rp_out.close();
 	f_rp_out.close();
-return 0;
+	return 0;
 };
