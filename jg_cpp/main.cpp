@@ -7,7 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <assert.h>
-
+#include <stdlib.h>
 using namespace std;
 int draw_unii(int i_min, int i_max, mt19937 &i_generator){
 	//maybe just initialize once!
@@ -27,7 +27,10 @@ int make_weighted_draw(vector <double> &w_prob_vector, mt19937 &w_generator){
 	//cout<<"Done making weighted draw"<<endl;
 	return w_distribution(w_generator);
 }
-
+int draw_poisson(double &p_mean, mt19937 &p_generator){
+	poisson_distribution<int> p_distribution (p_mean);
+	return p_distribution(p_generator);
+}
 
 
 class genotype_matrix{
@@ -346,7 +349,7 @@ class genotype_matrix{
 	}
 
 
-	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, const double &rg_var_effect, mt19937 &rc_randgen_var, const double &genome_rec_prob, int &rg_rec_point ){
+	void add_recombined_gamete_variable_sites(pair <int, int> ind_array_pos_var, const int &rg_window_size_var, const double &rg_min_ident_var, const double &rg_var_effect, mt19937 &rc_randgen_var, const double &genome_rec_prob, int &rg_rec_point,vector <double> **rec_vector_probs_var,  vector <int> **rec_vector_positions_var,  vector <int> **rec_vector_pos_array){
 			//vector <double> recomb_probs_var;
 			//vector <int> recomb_left_positions_var;
 			int window_end_it=0;
@@ -491,8 +494,9 @@ class genotype_matrix{
 				*/
 				//add genomic probability to last window
 				//recomb_probs_var.back()+=genome_rec_prob;
+				/*
+				cout<<"--------------------------"<<endl;
 				recomb_probs_var.emplace_back(genome_rec_prob);
-/*
 				double total_prob=0;
 				for(int i_rpv=0; i_rpv<recomb_probs_var.size(); i_rpv++){
 					cout<<recomb_probs_var[i_rpv]<<" ";
@@ -502,7 +506,7 @@ class genotype_matrix{
 				assert(total_prob<=genome_rec_prob+1);
 				//make weighted draw
 				cout<<"Making weighted draw. Prob vector size: "<<recomb_probs_var.size()<<",N var sites: "<<n_var_sites<<", recomb_left_positions_var size: "<<recomb_left_positions_var.size()<<endl;
-*/
+				*/
 				int rc_p_index=make_weighted_draw(recomb_probs_var, rc_randgen_var);
 				
 
@@ -520,13 +524,19 @@ class genotype_matrix{
 				//otherwise make recombinant gametes...
 				else{	
 					//I think this was wrong!			
-					//recombined_gamete(recomb_left_positions_var[rc_p_index], ind_array_pos_var);
+					//recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
 					recombined_gamete(recomb_left_positions_var[rc_p_index-1], ind_array_pos_var);
 				}
 				//
 				if(rc_p_index==recomb_probs_var.size()-1){
 					rg_rec_point=genome_size+1;
 				}
+				/*
+				else if(){
+				
+				
+				}
+				*/
 				else{
 				
 					rg_rec_point=position_array[recomb_left_positions_var[rc_p_index]];
@@ -536,8 +546,12 @@ class genotype_matrix{
 				//make non-recombinant gamete
 				non_recombined_gamete(ind_array_pos_var.first);
 			}
+			*rec_vector_positions_var=&recomb_left_positions_var;
+			*rec_vector_probs_var=&recomb_probs_var;
+			*rec_vector_pos_array=&position_array;
+			
 	}
-	void add_recombined_gamete_hotspot(pair <int, int> ind_array_pos_hs, const int &hs_window_size, const double &hs_min_ident, const double &hs_var_effect, mt19937 &hs_randgen_var, const double &hs_genome_rec_prob, bool hs_male_rec, int &hs_rec_point){
+	void add_recombined_gamete_hotspot(pair <int, int> ind_array_pos_hs, const int &hs_window_size, const double &hs_min_ident, const double &hs_var_effect, mt19937 &hs_randgen_var, const double &hs_genome_rec_prob, bool hs_male_rec, int &hs_rec_point, vector <double> **rec_vector_probs_hs, vector <int> **rec_vector_positions_hs){
 		int last_rec_pos=0;
 		int curr_rec_pos=0;
 		int hs_left_rec_pos=0;
@@ -634,6 +648,8 @@ class genotype_matrix{
 			recombined_gamete(hs_left_rec_sites[hs_p_index], ind_array_pos_hs);
 			
 		}
+		*rec_vector_probs_hs=&hs_modified_rec_probs;
+		*rec_vector_positions_hs=&hs_rec_sites;
 	}
 
 	void print_position_array(){
@@ -643,13 +659,19 @@ class genotype_matrix{
 		}
 		cout<<endl;
 	}
+	
 	//adds mutations to the temp array, operates on position array
 	void temp_add_mutations(double mutation_rate, double male_bias, vector <int> *mut_females, vector <int> *mut_males, mt19937 &am_randgen){
-		int total_number_of_mutations=(mut_males->size()+mut_females->size())*2*genome_size*mutation_rate;
+		double mean_mutations=(mut_males->size()+mut_females->size())*2*genome_size*mutation_rate;
+		int total_number_of_mutations=draw_poisson(mean_mutations, am_randgen);
 		//draw total number of mutations in males (use temp female array)
 		int female_muts=total_number_of_mutations*(1/(male_bias+1));
 		int male_muts=total_number_of_mutations-female_muts;
-		
+		//test if position array is large enough
+		if(position_array.size()+total_number_of_mutations>genome_size){
+			cout<<"Error: there are not enough free sites in the simulated region to add all mutations. Decrease mutation rate or population size or increase Genome size!"<<endl;
+			exit(EXIT_FAILURE);	
+		}		
 		
 	
 		//draw total number of mutations in females
@@ -659,6 +681,9 @@ class genotype_matrix{
 		int f_mut_count=0;
 		int m_mut_count=0;
 		while(f_mut_count+m_mut_count<male_muts+female_muts){
+
+
+
 			//draw mutation position
 			bool mutation_added=false;
 			while(mutation_added==false){
@@ -1069,7 +1094,23 @@ class genotype_matrix{
 		dxy_outfile<<endl;
 		dxx_outfile<<endl;
 	}
-
+	//, ofstream &rv_ofile 
+	/*
+	void write_rec_vectors(vector <int> &rv_var_sites, vector <double> &rv_rec_probs){
+		cout<<"Rec probs, size="<<rv_rec_probs.size()<<endl;
+		for(int i_r_rv=0; i_r_rv<rv_rec_probs.size(); i_r_rv++){
+			cout<<rv_rec_probs[i_r_rv]<<";";
+		}
+		cout<<endl;
+		if(rv_var_sites.size()>=rv_rec_probs.size()-2){
+			cout<<"var_sites, size="<<rv_var_sites.size()<<endl;
+			for(int i_r_vs=0; i_r_vs<rv_rec_probs.size()-2; i_r_vs++){
+				cout<<position_array[rv_var_sites[i_r_vs]]<<";";
+			}
+		}
+		cout<<genome_size<<endl<<"------------------------------------------------"<<endl;
+	}
+	*/
 	private:
 		
 
@@ -1083,9 +1124,9 @@ class genotype_matrix{
 			}
 			//positions in genotype array
 			int seq1_start_position=(seq1seq2ids.first*x_size);
-			int seq2_start_position=(seq1seq2ids.second*x_size)+ga_rec_pos_left+1;
+			int seq2_start_position=(seq1seq2ids.second*x_size)+ga_rec_pos_left;
 
-			for(int i_rec_pos=seq1_start_position; i_rec_pos<=seq1_start_position+ga_rec_pos_left; i_rec_pos++){
+			for(int i_rec_pos=seq1_start_position; i_rec_pos<seq1_start_position+ga_rec_pos_left; i_rec_pos++){
 				(*ta_pointer)[temp_last_position]=(*ga_pointer)[i_rec_pos];
 				temp_last_position++;
 			}
@@ -1211,13 +1252,17 @@ class population{
 
 	//rec mode: 0 -> total rec probs at all sites, 1 -> rec probs in blocks between variable sites, 3 -> random
 
-	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_rec_prob, bool record_mf_rec_points, const double &og_var_effect ){
+	void make_offspring_gen(genotype_matrix &gen_matrix, const int &og_window_size, const double &og_min_ident, mt19937 &o_randgen, int rec_mode, int o_size, double &og_rec_prob, bool record_mf_rec_points, ofstream &m_rec_vector_out,bool record_m_rec_vector,const double &og_var_effect, int o_genome_size ){
 		//empty record_probs
 		if(record_mf_rec_points==true){
 			m_rec_points.clear();
 			f_rec_points.clear();
-		}	
+		}
+		vector <double> *m_rec_vector=nullptr;
+		vector <int> *m_rec_pos=nullptr;
+		vector <int> *m_rec_pos_array=nullptr;
 
+		
 
 
 		//cout<<"Making offspring gen.."<<endl;
@@ -1263,12 +1308,15 @@ class population{
 			}
 			else if(rec_mode==1){
 
-				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, og_var_effect,  o_randgen, og_rec_prob, female_rec_point);	
-				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, male_rec_point);	
+				gen_matrix.add_recombined_gamete_variable_sites(f_gamete, og_window_size ,og_min_ident, og_var_effect,  o_randgen, og_rec_prob, female_rec_point, &m_rec_vector, &m_rec_pos, &m_rec_pos_array);	
+				gen_matrix.add_recombined_gamete_variable_sites(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, male_rec_point, &m_rec_vector, &m_rec_pos, &m_rec_pos_array);	
 			
 				if(record_mf_rec_points==true){
 					m_rec_points.push_back(male_rec_point);
 					f_rec_points.push_back(female_rec_point);
+				}
+				if(record_m_rec_vector==true){
+					write_rec_vector(m_rec_vector, m_rec_pos, m_rec_pos_array, m_rec_vector_out, o_genome_size);	
 				}
 						
 			}
@@ -1278,11 +1326,14 @@ class population{
 			}
 
 			else if(rec_mode==3){
-				gen_matrix.add_recombined_gamete_hotspot(f_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, false, female_rec_point);
-				gen_matrix.add_recombined_gamete_hotspot(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, true, male_rec_point);
+				gen_matrix.add_recombined_gamete_hotspot(f_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, false, female_rec_point, &m_rec_vector, &m_rec_pos);
+				gen_matrix.add_recombined_gamete_hotspot(m_gamete, og_window_size, og_min_ident, og_var_effect, o_randgen, og_rec_prob, true, male_rec_point, &m_rec_vector, &m_rec_pos);
 				if(record_mf_rec_points==true){
 					m_rec_points.push_back(male_rec_point);
 					f_rec_points.push_back(female_rec_point);
+				}
+				if(record_m_rec_vector==true){
+					write_rec_vector(m_rec_vector, m_rec_pos, m_rec_pos_array, m_rec_vector_out, o_genome_size);	
 				}
 			}
 
@@ -1385,9 +1436,31 @@ class population{
 			f_rc_ofile<<endl;
 		}
 	}
+	void write_rec_vector(vector <double> *rv_rec_vector, vector <int> *rv_rec_points, vector <int> *rv_position_array, ofstream &rv_rec_vector_outfile, int rv_genome_size){
+
+		if(rv_rec_points && rv_rec_vector){
+			
+			if(rv_position_array){
+				int start_point=1;
+				for(int i_rv_rec=0; i_rv_rec<rv_rec_vector->size()-1; i_rv_rec++){
+					rv_rec_vector_outfile<<start_point<<"-"<<(*rv_position_array)[(*rv_rec_points)[i_rv_rec]]<<":"<<(*rv_rec_vector)[i_rv_rec]<<"\t";
+					start_point=(*rv_position_array)[(*rv_rec_points)[i_rv_rec]]+1;
+				}
+				rv_rec_vector_outfile<<start_point<<"-"<<rv_genome_size<<":"<<(*rv_rec_vector)[rv_rec_vector->size()-1]<<endl;
+
+			}
+			else{
+				for(int i_rv_rec=0; i_rv_rec<rv_rec_points->size(); i_rv_rec++){
+					rv_rec_vector_outfile<<(*rv_rec_points)[i_rv_rec]<<":"<<(*rv_rec_vector)[i_rv_rec]<<"\t";
+				}	
+				rv_rec_vector_outfile<<endl;
+			}
+			
+		}
+	}
 };
 
-void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_rec_prob, double &c_var_effect, string &c_m_rp_ofile, string &c_f_rp_ofile, string &c_sdr_ofile, string &c_hs_conf_file){
+void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_gen_size, double &c_mut_rate, double &c_mr_male_bias, int &c_sd_pos, int &c_rc_wind, double &c_min_ident, int &c_sstat_wind, int &c_sstat_gen, string &c_fst_ofile, string &c_dxy_ofile, string &c_dxx_ofile, double &c_rec_prob, double &c_var_effect, string &c_m_rp_ofile, string &c_f_rp_ofile, string &c_sdr_ofile, string &c_hs_conf_file, string &c_m_rv_ofile){
 	ifstream config_file;
 	config_file.open(cfg_file_name);
 	string gc_line;
@@ -1453,6 +1526,9 @@ void read_config_file(string cfg_file_name, int &c_ngens, int &c_ninds, int &c_g
 			else if(param=="hotspot_conf"){
 				config_option>>c_hs_conf_file;
 			}
+			else if(param=="m_rv_ofile"){
+				config_option>>c_m_rv_ofile;
+			}
 		}
 	}
 }
@@ -1500,12 +1576,14 @@ int main(int argc, char *argv[]){
 	//name of the hotspot configuration file	
 	string hotspot_conf_file="";
 
+	string m_rv_ofile="";
+
 
 	//run mode: 1=dynamic model(standard), 2=random recombination events, 3=hotspot model
 	int run_mode=1;
 
 	//read config file
-	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, rec_prob, var_effect, m_rec_pos_ofile, f_rec_pos_ofile, sdr_ofile, hotspot_conf_file);
+	read_config_file(argv[1], ngens, n_inds, gen_size, mutation_rate, mr_male_bias, sd_loc, wind_size, min_ident, mean_rp_wind_size, sum_stat, fst_ofile, dxy_ofile, dxx_ofile, rec_prob, var_effect, m_rec_pos_ofile, f_rec_pos_ofile, sdr_ofile, hotspot_conf_file, m_rv_ofile);
 
 	//open FST sumstat output
 	ofstream fst_out;
@@ -1513,12 +1591,16 @@ int main(int argc, char *argv[]){
 	ofstream dxy_out;
 	ofstream m_rp_out;
 	ofstream f_rp_out;
+	ofstream m_rv_out;
 	//ofstream(sdr_out);
 	dxx_out.open(dxx_ofile);
 	dxy_out.open(dxy_ofile);
 	fst_out.open(fst_ofile);
 	m_rp_out.open(m_rec_pos_ofile);
 	f_rp_out.open(f_rec_pos_ofile);
+	if(m_rv_ofile!=""){
+		m_rv_out.open(m_rv_ofile);
+	}
 	//sdr_out.open(sdr_ofile);
 	fst_out<<"generation\tN_variants";
 	dxx_out<<"generation";
@@ -1552,11 +1634,16 @@ int main(int argc, char *argv[]){
 	population initial_pop(initial_sex_vector);
 	for(int i_gen=0; i_gen<ngens; i_gen++){
 		bool o_gen_rec_prob=false;
+		bool o_gen_rec_m_rv=false;
 		if(i_gen%sum_stat==0){
 			o_gen_rec_prob=true;
+			if(m_rv_ofile!=""){
+				o_gen_rec_m_rv=true;
+				m_rv_out<<"#gen "<<i_gen<<endl;
+			}
 		}
 
-		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, run_mode, n_inds, rec_prob, o_gen_rec_prob, var_effect );
+		initial_pop.make_offspring_gen(initial_matrix, wind_size, min_ident, r_generator, run_mode, n_inds, rec_prob, o_gen_rec_prob,m_rv_out,o_gen_rec_m_rv,var_effect, gen_size );
 //		cout<<"Made offspring..."<<endl;
 		initial_matrix.temp_remove_fixed_sites();
 		initial_matrix.temp_add_mutations(mutation_rate, mr_male_bias, initial_pop.return_temp_female_pointer(), initial_pop.return_temp_male_pointer(), r_generator);
