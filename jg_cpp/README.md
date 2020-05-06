@@ -40,7 +40,7 @@ $$ rec\_prob = \frac{ 1 - \frac{var\_effect * n\_variants}{rc\_wind}}{genome\_si
 #### Hotspot model
 
 This is the model that is run if the *hotspot_conf* parameter is set in the config file. In the hotspot model recombination can only take place at sites defined in the hotspot.conf file. Each mutation hotspot has a a priori recombination probability, which can be different for each hotspot and between sexes. 
-Recombination probabilities are estimated in the same way as in the dynamic model, with the difference that recombination probabilities are reduced relative to their a priori recombination probability.
+Recombination probabilities are estimated in the same way as in the dynamic model: Recombination probabilities are reduced based on the number of variants within *rc_wind* around each hotspot (variants outside this region have no effect on recombination probabilities). Here the difference is that recombination probabilities are reduced relative to their a priori recombination probability.
 
 $$ rec\_prob = a\_priori\_rec\_prob * ( 1 - \frac{var\_effect * n\_variants}{rc\_wind} )$$ 
 
@@ -51,6 +51,7 @@ The number of mutations are defined by two parameters:
 
 * *mut_rate*: The mutation rate, the absolute number of mutations per generation is calculated as $$ n\_muts =mut\_rate * 2 * pop\_size * genome\_size $$
 * *mut_mb*: male bias of the mutation rate, this parameter can change how the absolute number of mutations is divided between males and females.
+At each generation the number of mutations are drawn from a poisson distribution and are then divided between males and females.
 $$ n\_muts\_f = n\_muts * \frac{1}{mut\_mb + 1} $$
 $$ n\_muts\_m = n\_muts - n\_muts\_f $$
 
@@ -100,6 +101,9 @@ This file determines all the parameters of the model. A parameter is defined as 
 
 * *hotspot_conf*: filename of the configuration file for the hotspot model. If this parameter is set, the hotspot model will run, if not the dynamic model.
 
+* *m_rv_ofile*: filename for the output file of male recombination probability vectors. This parameter is optional, if it is not set there is no output file. 
+
+
 ### Hotspot configuration file
 
 This file defines the recombination points for the hotspot model. A hotspot is defined by its position, its relative, a priori recombination probability in male meiosis and its relative a priori recombination probability in female meiosis.
@@ -132,11 +136,18 @@ This file records all recombination positions in a generation in males or female
 
 Please not that:
 
-* recombination positions are not exact in the dynamic model, because recombination probabilities are integrated over blocks.
+* recombination positions are not exact in the dynamic model, because recombination probabilities are integrated over blocks. This may result in a lower number of recombination events for the first positions of the simulated region, which is not an error in the simulations, but a limitation in the way recombination events are recorded.
 
 * recombination events that fall outside the simulated region will be recorded as genome_size+1
 
 The output file includes the generation in the first column and a list of all recombination events in this generation in the second column.
+
+### male recombination probability vectors
+
+This output file contains the probability vectors that are used to draw recombination points in males. As one vector is output for each male meiosis *sstat_gen*, it can get rather large (several hundred mb!), so it is optional.
+Vectors are output in blocks for each generation, starting with #gen *generation* and followed by one probability vector per line.
+For the dynamic model, recombination probabilities are integrated over blocks between variable sites. One block is output as: *begin*-*end*:*recombination probability*, blocks are tab-separated.
+For the hotspot model recombination probabilities are output for each hotspot as: *hotspot position*:*recombination probability*
 
 ## Running the code:
 The software can be build (under linux) using:
