@@ -144,7 +144,7 @@ The output file includes the generation in the first column and a list of all re
 
 ### male recombination probability vectors
 
-This output file contains the probability vectors that are used to draw recombination points in males. As one vector is output for each male meiosis *sstat_gen*, it can get rather large (several hundred mb!), so it is optional.
+This output file contains the probability vectors that are used to draw recombination points in males. Each vector output was used to in a male meiosis create a gamete during the generation defined by *sstat_gen*. Only gametes and males which contribute to the next generation are output.  As this file can get rather large (several hundred mb!), it is optional.
 Vectors are output in blocks for each generation, starting with #gen *generation* and followed by one probability vector per line.
 For the dynamic model, recombination probabilities are integrated over blocks between variable sites. One block is output as: *begin*-*end*:*recombination probability*, blocks are tab-separated.
 For the hotspot model recombination probabilities are output for each hotspot as: *hotspot position*:*recombination probability*
