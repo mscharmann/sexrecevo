@@ -1124,9 +1124,9 @@ class genotype_matrix{
 			}
 			//positions in genotype array
 			int seq1_start_position=(seq1seq2ids.first*x_size);
-			int seq2_start_position=(seq1seq2ids.second*x_size)+ga_rec_pos_left;
+			int seq2_start_position=(seq1seq2ids.second*x_size)+ga_rec_pos_left+1;
 
-			for(int i_rec_pos=seq1_start_position; i_rec_pos<seq1_start_position+ga_rec_pos_left; i_rec_pos++){
+			for(int i_rec_pos=seq1_start_position; i_rec_pos<=seq1_start_position+ga_rec_pos_left; i_rec_pos++){
 				(*ta_pointer)[temp_last_position]=(*ga_pointer)[i_rec_pos];
 				temp_last_position++;
 			}
