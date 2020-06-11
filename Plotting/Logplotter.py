@@ -104,7 +104,7 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
     ## make some pretty colours
 
     BuPu = plt.get_cmap("BuPu")
-    cNorm  = colors.Normalize(vmin=min(generations)-500, vmax=max(generations))
+    cNorm  = colors.Normalize(vmin=min(generations)-3000, vmax=max(generations))
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=BuPu)
 
     colour_index = 0

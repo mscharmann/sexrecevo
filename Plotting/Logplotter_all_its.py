@@ -3,7 +3,7 @@ import sys
 import warnings
 warnings.filterwarnings("ignore")
 
-def Logplotter(logfile_dir, Stat_to_plot = "fst", gen_steps = 1, n_its = None):
+def Logplotter(logfile_dir, Stat_to_plot = "fst", gen_steps = 1, it_start = 1, it_stop = None):
     
     """
 Logplotter - Plots outputs from Sex chromosome recombination evolution simulations
@@ -16,7 +16,8 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
                      must be unique to that type of logfile. e.g. "fst", "dxy", "XX", "XY". Default = "fst"
     gen_steps      - Controls the number of generations which will be plotted - e.g. if gen_steps = 5, every 5 
                      generational measurements will be plotted. Default = 1 (i.e. All measurements will be plotted)
-    n_its          - Number of iterations (files) to plot. Default = All.
+    it_start       - Iteration to start plotting from (Default: 1)
+    it_stop        - Iteration to stop plotting to (Default: All iterations plotted)
     
     """
     
@@ -31,21 +32,25 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
     ## Get files, generation and window numbers. 
 
     logfiles = []
-
+    iter_stop = 0
+    
     for logfile in os.listdir(logfile_dir):
         if Stat_to_plot in logfile and "pdf" not in logfile and "png" not in logfile:
             logfiles.append("%s/%s" % (logfile_dir, logfile))
-            if n_its != None:
-                logfiles = logfiles[:n_its]
+            iter_stop += 1
+
+    if it_stop == None:
+        it_stop = iter_stop
+
+    logfiles = logfiles[it_start:it_stop]
 
     ## Get the number of generations and iterations
     # Mathias modified: if some runs are incomplete for the number of generations, find the largest generation that was achieved in any of the runs (files)
     generations = []
     iterations = []
+    
     for f in logfiles:
-        print f
-#        iterations.append(f.rpartition("/")[2].split("_")[3].split(".")[0])
-
+#        print f
         with open(f, "r") as F:
     	    for line in F:
                 if not any(["site" in line, "generation" in line]):
@@ -66,7 +71,11 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
     Raw_data_by_iteration = {}
     
     for logfile in logfiles:
-        iteration = logfile.rpartition("/")[2].split("_")[3].split(".")[0]
+        if Stat_to_plot in ["dxy", "dxx"]:
+            iteration = logfile.rpartition("/")[2].split("_")[1].split(".")[0]
+        
+        elif Stat_to_plot == "fst":
+            iteration = logfile.rpartition("/")[2].split("_")[3].split(".")[0]
 
         Raw_data_by_iteration[iteration] = {}
 
@@ -88,19 +97,7 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
                     field_index += 1
 
 
-
-    ## Now get the averages
-
-#    Averaged_data_by_gen = {}
-
-#    for gen in Raw_data_by_gen:
-#        Averaged_data_by_gen[gen] = {}
-#        for window in Raw_data_by_gen[gen]:
-#            Averaged_data_by_gen[gen][window] = np.average(Raw_data_by_gen[gen][window])
-
-
-
-    ### Now for the plotting  ###
+    ### Plotting  ###
 
 #    plt.style.use('dark_background')
     fig = plt.figure(figsize = (20,10))
@@ -113,9 +110,14 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
     cNorm  = colors.Normalize(vmin=min(generations)-500, vmax=max(generations))
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=BuPu)
     
-
+    progress = 0
     for iteration in Raw_data_by_iteration:
-        print "Plotting iteration %s" % iteration
+        
+        # report progress
+        progress += 1
+        if  progress % 10 == 0:
+            print "Plotted %s iterations" % progress
+
         colour_index = 0
         plot_max = 0
         
@@ -165,30 +167,27 @@ Logplotter - Plots outputs from Sex chromosome recombination evolution simulatio
     cb_inset.imshow((generations,generations), cmap=BuPu, extent=[min(generations),max(generations),0,1000])
     cb_inset.axes.get_yaxis().set_visible(False)    
 
-    if n_its == None:
-      N_ITS = "ALL"
-    else:
-      N_ITS = n_its
+    plt.savefig("%s/%s_summary_plot_ITS_%s-%s.pdf" % (logfile_dir, Stat_to_plot, it_start, it_stop))
+    plt.savefig("%s/%s_summary_plot_ITS_%s-%s.png" % (logfile_dir, Stat_to_plot, it_start, it_stop))
 
-    plt.savefig("%s/%s_summary_plot_%s_ITS.pdf" % (logfile_dir, Stat_to_plot, N_ITS))
-    plt.savefig("%s/%s_summary_plot_%s_ITS.png" % (logfile_dir, Stat_to_plot, N_ITS))
-
-    print "All done! Your plots are here: %s/%s_summary_plot_%s_ITS*" % (logfile_dir, Stat_to_plot, N_ITS)
+    print "All done! Your plots are here: %s/%s_summary_plot_ITS_%s-%s*" % (logfile_dir, Stat_to_plot, it_start, it_stop)
 
 
-if len(sys.argv) == 5:
+if len(sys.argv) == 6:
     
     working_dir = sys.argv[1]
     stat = sys.argv[2]
     steps = int(sys.argv[3])
-    its = int(sys.argv[4])
+    its_start = int(sys.argv[4])
+    its_stop = int(sys.argv[5])
 
-    Logplotter(working_dir,stat,steps,its)
+    Logplotter(working_dir, stat, steps, its_start, its_stop)
 
 elif len(sys.argv) == 3:
     working_dir = sys.argv[1]
     stat = sys.argv[2]
-    Logplotter(working_dir,stat)
+
+    Logplotter(working_dir, stat)
 
 else:
     sys.exit("\nERROR: Incorrect number of arguments\n%s" % Logplotter.__doc__)

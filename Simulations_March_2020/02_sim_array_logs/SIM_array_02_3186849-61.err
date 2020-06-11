@@ -1,0 +1,16 @@
+sed: can't read /scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//template_hotspot.conf: No such file or directory
+mv: cannot move ‘SIM_array_02_3186849-55.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-55.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-55.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-55.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-56.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-56.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-56.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-56.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-59.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-59.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-59.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-59.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-61.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-61.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-61.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-61.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-87.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-87.err’: Device or resource busy
+mv: cannot stat ‘SIM_array_02_3186849-87.out’: No such file or directory
+mv: cannot move ‘SIM_array_02_3186849-88.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-88.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-93.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-93.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-93.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-93.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-98.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-98.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-98.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-98.out’: Device or resource busy

@@ -1,0 +1,20 @@
+sed: can't read /scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//template_hotspot.conf: No such file or directory
+mv: cannot move ‘SIM_array_02_3186849-10.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-10.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-40.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-40.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-40.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-40.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-42.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-42.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-42.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-42.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-43.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-43.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-45.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-45.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-45.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-45.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-46.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-46.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-46.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-46.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-47.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-47.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-48.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-48.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-48.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-48.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-49.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-49.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-49.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-49.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-8.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-8.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-8.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-8.out’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-9.err’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-9.err’: Device or resource busy
+mv: cannot move ‘SIM_array_02_3186849-9.out’ to ‘/scratch/axiom/FAC/FBM/DEE/jpannell/merc_omics_dlj/sexrecevo/Simulations_March_2020//02_sim_array_logs/SIM_array_02_3186849-9.out’: Device or resource busy
