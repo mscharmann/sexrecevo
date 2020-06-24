@@ -494,9 +494,8 @@ class genotype_matrix{
 				*/
 				//add genomic probability to last window
 				//recomb_probs_var.back()+=genome_rec_prob;
-				/*
-				cout<<"--------------------------"<<endl;
 				recomb_probs_var.emplace_back(genome_rec_prob);
+				/*
 				double total_prob=0;
 				for(int i_rpv=0; i_rpv<recomb_probs_var.size(); i_rpv++){
 					cout<<recomb_probs_var[i_rpv]<<" ";
@@ -664,6 +663,7 @@ class genotype_matrix{
 	void temp_add_mutations(double mutation_rate, double male_bias, vector <int> *mut_females, vector <int> *mut_males, mt19937 &am_randgen){
 		double mean_mutations=(mut_males->size()+mut_females->size())*2*genome_size*mutation_rate;
 		int total_number_of_mutations=draw_poisson(mean_mutations, am_randgen);
+		//cout<<"N_mutations:"<<total_number_of_mutations<<endl;
 		//draw total number of mutations in males (use temp female array)
 		int female_muts=total_number_of_mutations*(1/(male_bias+1));
 		int male_muts=total_number_of_mutations-female_muts;
