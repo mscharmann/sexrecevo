@@ -1442,11 +1442,11 @@ class population{
 			
 			if(rv_position_array){
 				int start_point=1;
-				for(int i_rv_rec=0; i_rv_rec<rv_rec_vector->size()-1; i_rv_rec++){
+				for(int i_rv_rec=0; i_rv_rec<rv_rec_vector->size()-2; i_rv_rec++){
 					rv_rec_vector_outfile<<start_point<<"-"<<(*rv_position_array)[(*rv_rec_points)[i_rv_rec]]<<":"<<(*rv_rec_vector)[i_rv_rec]<<"\t";
 					start_point=(*rv_position_array)[(*rv_rec_points)[i_rv_rec]]+1;
 				}
-				rv_rec_vector_outfile<<start_point<<"-"<<rv_genome_size<<":"<<(*rv_rec_vector)[rv_rec_vector->size()-1]<<endl;
+				rv_rec_vector_outfile<<start_point<<"-"<<rv_genome_size<<":"<<(*rv_rec_vector)[rv_rec_vector->size()-2]<<endl;
 
 			}
 			else{
