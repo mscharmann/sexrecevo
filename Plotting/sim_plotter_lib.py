@@ -338,34 +338,6 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
     N_iterations = len(pergen_perbase_avgs_filepaths)
     wd = pergen_perbase_avgs_filepaths[0].rpartition("/")[0]
     
-    
-    ## first pass to get the number of generations to use (cant think of a more efficient way to do this unfortunately)
-    
-    print("   Evaluating iterations and generations in the simulation")
-    
-    all_generations = []
-    
-    for rv_avgs_filepath in pergen_perbase_avgs_filepaths:
-        
-        with open(rv_avgs_filepath, 'r') as rv_avgs_file:
-            
-            for line in rv_avgs_file:
-                
-                all_generations.append(line.split()[0])
-                
-    generation_counter = Counter(all_generations)
-    
-    generations = []
-    
-    for generation in generation_counter:
-        if generation_counter[generation] == N_iterations:
-            generations.append(int(generation))
-
-    generations = sorted(generations)
-    print("   Last generation for which all (%s) iterations completed = %s" % (N_iterations, max(generations)))
-
-    
-    
     ## generate the per base averages across all simulations (iterations) - this is now the most time consuming part of the whole process. 
 
     per_gen_per_base_all_sim_avgs = {}  ## will contain one vector for each generation (e.g. 200 x 10k vector. Still quite big)
@@ -374,6 +346,8 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
     print("\nGenerating per-base averages across %s iterations using 1 thread: " % N_iterations)
     
     perbase_pergen_all_sim_avgs_outpath = "%s/Perbase_pergen_avgs_over_%s_iterations.txt" % (wd, N_iterations)
+    
+    all_generations = []  ## track which generations are present in all iterations
 
     if os.path.exists(perbase_pergen_all_sim_avgs_outpath):
         print("\nA file containing per-base averages across %s iterations already exists - using this. Remove this file if you wish to recalculate." % N_iterations)
@@ -382,35 +356,73 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
             
             for line in perbase_pergen_all_sim_avgs_out_handle:
                 
-               per_gen_per_base_all_sim_avgs[int(line.split()[0])] = np.asarray([float(i) for i in line.split("\t")[1:]])
+                gen = int(line.split()[0])
+                all_generations.append(gen)
+                per_gen_per_base_all_sim_avgs[gen] = np.asarray([float(i) for i in line.split("\t")[1:]])
+
+        ## find last generation which is completed for all iterations included
+        generation_counter = Counter(all_generations)
+
+        generations = []
+
+        for generation in generation_counter:
+            if generation_counter[generation] == N_iterations:
+                generations.append(int(generation))
+            else:
+                del per_gen_per_base_all_sim_avgs[generation]
+
+        generations = sorted(generations)
+        print("   Last generation for which all (%s) iterations completed = %s" % (N_iterations, max(generations)))
+
 
     else:
-        print("\nGenerating per-base averages across %s iterations using 1 thread: " % N_iterations)
 
         with open(perbase_pergen_all_sim_avgs_outpath, 'w') as perbase_pergen_all_sim_avgs_out_handle:
     
             for iteration_file in pergen_perbase_avgs_filepaths:
-            
+                
                 with open(iteration_file, 'r') as iteration:  
 
                     for line in iteration:
 
                         gen = int(line.split("\t")[0])
+                        all_generations.append(gen)
 
-                        if gen in generations:  ## only use generations for which all iterations were present
-
-                            if gen not in per_gen_per_base_all_sim_avgs:
-                                per_gen_per_base_all_sim_avgs[gen] = np.asarray([float(i) for i in line.split("\t")[1].split()])
+                        if gen not in per_gen_per_base_all_sim_avgs:
+                            per_gen_per_base_all_sim_avgs[gen] = np.asarray([float(i) for i in line.split("\t")[1].split()])
     
-                            else:
-                                per_gen_per_base_all_sim_avgs[gen] = np.sum([per_gen_per_base_all_sim_avgs[gen], np.asarray([float(i) for i in line.split("\t")[1].split()])], axis = 0)
-                        
-                for gen in per_gen_per_base_all_sim_avgs:
+                        else:
+                            per_gen_per_base_all_sim_avgs[gen] = np.sum([per_gen_per_base_all_sim_avgs[gen], np.asarray([float(i) for i in line.split("\t")[1].split()])], axis = 0)
 
-                    per_gen_per_base_all_sim_avgs[gen] = per_gen_per_base_all_sim_avgs[gen]/len(pergen_perbase_avgs_filepaths)  
+                print("   File %s done" % iteration_file)
+        
+            for gen in per_gen_per_base_all_sim_avgs:
+
+                per_gen_per_base_all_sim_avgs[gen] = per_gen_per_base_all_sim_avgs[gen]/len(pergen_perbase_avgs_filepaths)  
+                perbase_pergen_all_sim_avgs_out_handle.write("%s\t%s\n" % (gen, "\t".join(str(i) for i in per_gen_per_base_all_sim_avgs[gen])))
+            
+
+            ## after all iterations done, evaluate which generations were completed in all included iterations
+
+            generation_counter = Counter(all_generations)
+
+            generations = []
+
+            for generation in generation_counter:
+                if generation_counter[generation] == N_iterations:
+                    generations.append(int(generation))
+
+            generations = sorted(generations)
+            print("   Last generation for which all (%s) iterations completed = %s" % (N_iterations, max(generations)))
+
+            print("\nWriting per-gen per-base recomb prob averages to %s" % perbase_pergen_all_sim_avgs_outpath)
+            
+            for gen in per_gen_per_base_all_sim_avgs:
+                if gen in generations:
+                    per_gen_per_base_all_sim_avgs[gen] = per_gen_per_base_all_sim_avgs[gen]/len(pergen_perbase_avgs_filepaths)
                     perbase_pergen_all_sim_avgs_out_handle.write("%s\t%s\n" % (gen, "\t".join(str(i) for i in per_gen_per_base_all_sim_avgs[gen])))
-
-                print("   File %s done" % iteration_file)   
+                else:
+                    del per_gen_per_base_all_sim_avgs[gen]
 
  
     #######
@@ -434,7 +446,7 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
 
     ## get window averages
 
-    print("\n\nGenerating window averages across %s iterations: " % N_iterations)
+    print("\n\nGenerating window averages across %s iterations for plotting: " % N_iterations)
     print("Generation: ", end = " ")
     
     for gen in generations:
@@ -482,7 +494,7 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
     xtick_sampler = int(np.round(len(positions)/int(len(windows)/2)))
     print(xtick_sampler)
     ax1.set_xticks(range(0,len(windows), 2))
-    ax1.set_xticklabels(positions[::xtick_sampler],rotation = 30)
+    ax1.set_xticklabels([i-1 for i in positions][::xtick_sampler],rotation = 30)
 
 
     ## set the ylim so all plots start from 0
@@ -727,7 +739,7 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
         
         if not "AVGS" in file:
             
-            if not os.path.exists("%s/%s_AVGS.out" % (wd, file.rpartition(".")[0])):
+            if not os.path.exists("%s/%s_AVGS.out" % (wd, file.split(".")[0])):
                 
                 per_base_avg_files_to_run.append(file)
                 
@@ -800,7 +812,7 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
 
             iteration = rv_avgs_file_path.rpartition("/")[2].split("_")[2].split(".")[0]
             print("   NRRs for iteration %s already exist, not calculating. Delete existing NRR file to recalculate" % iteration)
-
+            
             NRR_per_it_unreduced[iteration] = {}
 
             with open(iteration_NRR_outpath) as iteration_out_handle:
@@ -809,55 +821,59 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
 
         else:
             NRR_files_to_run.append(rv_avgs_file_path)
+    
+    if len(NRR_files_to_run) > 0:
 
-    if N_threads > 1:
-         
-        pool = mp.Pool(N_threads)
-        
-        results = pool.map(NRR_lengths_per_it, NRR_files_to_run)
-        
-        for i in results: ## unpack pooled results
+        if N_threads > 1:
+             
+            pool = mp.Pool(N_threads)
             
-            iteration = str(i[0])
+            results = pool.map(NRR_lengths_per_it, NRR_files_to_run)
             
-            for rv_file in rv_files_to_run:
-                if "_%s" % iteration in rv_file:
-
-                    iteration_NRR_outpath = "%s/%s_NRR.out" % (wd, rv_file.rpartition(".")[0])
-
-                with open(iteration_NRR_outpath, 'w') as iteration_out_handle:
-            
-                    NRR_per_it_unreduced[i[0]] = i[1]
+            for i in results: ## unpack pooled results
                 
-                    for gen in i[1]:
-                        iteration_out_handle.write("%s\t%s\n" % (gen, i[1][gen]))
-            
-        pool.close()
-        pool.join()
+                iteration = str(i[0])
+                
+                for rv_file in rv_files_to_run:
+                    if "_%s." % iteration in rv_file:  ## the "." is very important here
+    
+                        iteration_NRR_outpath = "%s/%s_NRR.out" % (wd, rv_file.rpartition(".")[0])
+                        print("   Writing NRR sizes for iteration %s to %s" % (iteration, iteration_NRR_outpath))
+                    with open(iteration_NRR_outpath, 'w') as iteration_out_handle:
+                
+                        NRR_per_it_unreduced[i[0]] = i[1]
+                    
+                        for gen in i[1]:
+                            iteration_out_handle.write("%s\t%s\n" % (gen, i[1][gen]))
+                
+            pool.close()
+            pool.join()
             
         
-        
-    elif N_threads == 1:
-
-        with open(iteration_NRR_outpath, 'w') as iteration_out_handle:
-
-            for rv_avgs_filepath in NRR_files_to_run:
-
-                rv_avgs_filepath = "%s/%s_AVGS.out" % (wd, file.rpartition(".")[0])
-
-                iteration = rv_avgs_filepath.rpartition("/")[2].split("_")[2].split(".")[0]
-
-                NRR_per_it_unreduced[iteration] = NRR_lengths_per_it(rv_avgs_filepath)[1]
-       
-                for gen in NRR_per_it_unreduced[iteration]:
-                    iteration_out_handle.write("%s\t%s\n" % (gen, NRR_per_it_unreduced[iteration][gen]))
+            
+        elif N_threads == 1:
+    
+            with open(iteration_NRR_outpath, 'w') as iteration_out_handle:
+    
+                for rv_avgs_filepath in NRR_files_to_run:
+    
+                    rv_avgs_filepath = "%s/%s_AVGS.out" % (wd, file.rpartition(".")[0])
+    
+                    iteration = rv_avgs_filepath.rpartition("/")[2].split("_")[2].split(".")[0]
+    
+                    NRR_per_it_unreduced[iteration] = NRR_lengths_per_it(rv_avgs_filepath)[1]
+           
+                    for gen in NRR_per_it_unreduced[iteration]:
+                        iteration_out_handle.write("%s\t%s\n" % (gen, NRR_per_it_unreduced[iteration][gen]))
 
  
     print("\n   Reducing NRR sizes dataset to contain only generations completed in ALL processed iterations!")
     
     from collections import Counter
+
     generations = []
     generations_to_keep = []
+
     for iteration in NRR_per_it_unreduced:
         for gen in NRR_per_it_unreduced[iteration]:
             generations.append(gen)
