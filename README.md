@@ -1,5 +1,12 @@
 # Neutral sex chromsome evolution model simulation
 
+This code is part of the following manuscript:
+```
+Daniel L. Jeffries, Jörn F. Gerchen, Mathias Scharmann, John R. Pannell (2020) A neutral model for the loss of recombination on sex chromosomes. TBA.
+```
+all authors are at the Department of Ecology and Evolution, University of Lausanne, 1015 Lausanne, Switzerland.
+
+
 This software simulates a dioecious population (without selection) with non-overlapping generations and a fixed number of diploid individuals. The evolution of recombination surpression around the sex determining region (SDR) is simulated explicitly.
 
 ## Steps in one generation:
