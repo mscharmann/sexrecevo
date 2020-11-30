@@ -2,7 +2,8 @@
 
 This code is part of the following manuscript:
 ```
-Daniel L. Jeffries, Jörn F. Gerchen, Mathias Scharmann, John R. Pannell (2020) A neutral model for the loss of recombination on sex chromosomes. TBA.
+Daniel L. Jeffries, Jörn F. Gerchen, Mathias Scharmann, John R. Pannell (2020)
+A neutral model for the loss of recombination on sex chromosomes. TBA.
 ```
 all authors are at the Department of Ecology and Evolution, University of Lausanne, 1015 Lausanne, Switzerland.
 
