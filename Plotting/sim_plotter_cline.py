@@ -25,6 +25,7 @@ NRR_Gnome_size = 100000
 NRR_N_gams = 100
 NRR_RC_WIND = 1000
 NRR_xtick_sampler = 20
+NRR_hotspot = False
 
 
 ## Get and check non default params from plotting.config file
@@ -95,17 +96,22 @@ for arg in config:
                 print("  %s = %s" % (arg_name, arg_value))
                 
             elif arg_name == "NRR_N_gams":
-                NRR_N_gams = arg_value
+                NRR_N_gams = int(arg_value)
                 print("  %s = %s" % (arg_name, arg_value))
                 
             elif arg_name == "NRR_RC_WIND":
                 NRR_RC_WIND = int(arg_value)
-                print("  %s = %s" % arg_name, arg_value)
+                print("  %s = %s" % (arg_name, arg_value))
                 
             elif arg_name == "NRR_xtick_sampler":
                 NRR_xtick_sampler = int(arg_value)
                 print("  %s = %s" % (arg_name, arg_value))
-                
+            
+            elif arg_name == "NRR_hotspot":
+                NRR_hotspot = arg_value
+                print("  %s = %s" % (arg_name, arg_value))
+
+            
 if Multi_sim_dir == None and Single_sim_dir == None:
     print("No directories supplied")
 
@@ -129,7 +135,8 @@ sp.sex_chrom_sim_plotter(Multi_sim_dir = Multi_sim_dir,
                          NRR_Gnome_size = NRR_Gnome_size,
                          NRR_N_gams = NRR_N_gams,
                          NRR_RC_WIND = NRR_RC_WIND,
-                         NRR_xtick_sampler = NRR_xtick_sampler)
+                         NRR_xtick_sampler = NRR_xtick_sampler,
+                         NRR_hotspot = NRR_hotspot)
         
         
 

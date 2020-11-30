@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 ###############################################################################################################################################################################################
 
 
-def rv_to_perbase_avg(rv_file_path, n_gams = 100):
+def rv_to_perbase_avg(rv_file_path, n_gams, hotspot, genome_size = 100000):
 
     """
     Generate average per-base recombination probability vectors for each gamete in the r output file and average across a generation.
@@ -18,15 +18,22 @@ def rv_to_perbase_avg(rv_file_path, n_gams = 100):
     """
 
     import numpy as np
+    import sys
+    import re
 
     iteration = rv_file_path.split(".")[0].rpartition("_")[2]
-    print(rv_file_path)
+    
+    ## regex to define the desired format for each block - used below to check if recomb file is intact.
+    block_format = re.compile("^[0-9]*-[0-9]*:[0-9]")
+
 
     with open(rv_file_path, 'r') as rv_handle:
 
         print("Generation: ", end = " ")
 
         pergen_perbase_averages = {}
+
+        file_intact = True
 
         for line in rv_handle:
 
@@ -40,44 +47,71 @@ def rv_to_perbase_avg(rv_file_path, n_gams = 100):
             else:
                 gamcount += 1
                 blocks = line.split()
-                gamete_vector = []  ## make a per-base vector for each gamete
+                
+                ## make a per-base vector for each gamete
 
-                for block in blocks:
-                    STRT = int(block.split(":")[0].split("-")[0])
-                    END = int(block.split(":")[0].split("-")[1])
-                    BLOCK_PROB = float(block.split(":")[1])
-                    if (END - (STRT-1)) < 1:
-                        PERBASE_PROB = BLOCK_PROB
-                    else:
-                        PERBASE_PROB = BLOCK_PROB/(END - (STRT-1))
+                gamete_vector = []  
+                
+                if hotspot:  ## if its a hotspot run, the recomb probs will be per-position not per-block
+
+                    for block in blocks:
+                        POS = int(block.split(":")[0])
+                        POS_PROB = float(block.split(":")[1])
+
+                        gamete_vector.append(POS_PROB)
+
+                else:
+
+                    for block in blocks:
+
+                        ## Check that the block is intact (in case something went wrong when writing the file)
+                        match = block_format.match(block)
+
+                        if match:
+                            STRT = int(block.split(":")[0].split("-")[0])
+                            END = int(block.split(":")[0].split("-")[1])
+                            BLOCK_PROB = float(block.split(":")[1])
+                        
+                            if (END - (STRT-1)) < 1:
+                                PERBASE_PROB = BLOCK_PROB
+                            else:
+                                PERBASE_PROB = BLOCK_PROB/(END - (STRT-1))
                     
-                    if PERBASE_PROB == 0:
-                        PERBASE_PROB = 0.0000000001  ## this allows to plot log later while still keeping these values at essentially zero
+                            gamete_vector.extend([PERBASE_PROB]*(END - (STRT-1)))
+                        else:
+                            print("PROBLEM with block format in file %s at generation %s, block: %s" % (rv_file_path.rpartition("/")[2], GEN, block))
+                            file_intact = False
+                
+                
+                if file_intact == True:
+                    #print("File %s intact as of generation %s" % (rv_file_path.rpartition("/")[2], GEN))
 
-                    gamete_vector.extend([PERBASE_PROB]*(END - (STRT-1)))
+                    if gamcount == 1: ## if its the first gamete of the generation
+                        per_base_sum = gamete_vector # make per_base_sum the gamete vector
 
-                if gamcount == 1: ## if its the first gamete of the generation
-                    per_base_sum = gamete_vector # make per_base_sum the gamete vector
+                    else: ## if its not the first gamete, add it to the existing sum
+                        if len(gamete_vector) == len(per_base_sum):
+                            per_base_sum = np.sum([per_base_sum, gamete_vector], axis = 0)
+                        else:
+                            print("Gamete %s vector not the right length for gen %s in file %s" % (gamcount, GEN, rv_file_path.rpartition("/")[2]))
+                            file_intact == False
 
-                else: ## if its not the first gamete, add it to the existing sum
-                    per_base_sum = np.sum([per_base_sum, gamete_vector], axis = 0)
+                    if gamcount == n_gams:  ## divide gamete per base sum by number of gametes
+                        pergen_perbase_averages[int(GEN)] = per_base_sum/n_gams
 
-                if gamcount == n_gams:  ## divide gamete per base sum by number of gametes
-                    pergen_perbase_averages[int(GEN)] = per_base_sum/n_gams
-
-                    
-        rv_avgs_outpath = "%s_AVGS.out" % rv_file_path.rpartition(".")[0]
         
-        with open(rv_avgs_outpath, 'w') as rv_avgs_out:
-            for gen in pergen_perbase_averages:
-                rv_avgs_out.write("%s\t" % gen)
-                for i in pergen_perbase_averages[gen]:
-                    rv_avgs_out.write("%s " % i)
-                rv_avgs_out.write("\n")
+        if file_intact == True:
+            
+            rv_avgs_outpath = "%s_AVGS.out" % rv_file_path.rpartition(".")[0]
         
-        print("Iteration %s done" % iteration)
-        #return pergen_perbase_averages
-
+            with open(rv_avgs_outpath, 'w') as rv_avgs_out:
+                for gen in pergen_perbase_averages:
+                    rv_avgs_out.write("%s\t" % gen)
+                    for i in pergen_perbase_averages[gen]:
+                        rv_avgs_out.write("%s " % i)
+                    rv_avgs_out.write("\n")
+        
+            print("Iteration %s done" % iteration)
 
 
 ###############################################################################################################################################################################################
@@ -306,7 +340,7 @@ def Recomb_prob_plot_per_window_per_iteration(pergen_perbase_avgs_filepath, outp
 ###############################################################################################################################################################################################
 
 
-def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "AVGS", genome_size = 100000, rc_wind = 1000, tick_sampler = 20):
+def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "AVGS", genome_size = 100000, rc_wind = 100, tick_sampler = 20):
 
     """
 
@@ -345,7 +379,7 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
     
     print("\nGenerating per-base averages across %s iterations using 1 thread: " % N_iterations)
     
-    perbase_pergen_all_sim_avgs_outpath = "%s/Perbase_pergen_avgs_over_%s_iterations.txt" % (wd, N_iterations)
+    perbase_pergen_all_sim_avgs_outpath = "%s/Perbase_pergen_avgs_over_%s_iterations.out" % (wd, N_iterations)
     
     all_generations = []  ## track which generations are present in all iterations
 
@@ -421,8 +455,6 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
                 if gen in generations:
                     per_gen_per_base_all_sim_avgs[gen] = per_gen_per_base_all_sim_avgs[gen]/len(pergen_perbase_avgs_filepaths)
                     perbase_pergen_all_sim_avgs_out_handle.write("%s\t%s\n" % (gen, "\t".join(str(i) for i in per_gen_per_base_all_sim_avgs[gen])))
-                else:
-                    del per_gen_per_base_all_sim_avgs[gen]
 
  
     #######
@@ -446,34 +478,33 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
 
     ## get window averages
 
-    print("\n\nGenerating window averages across %s iterations for plotting: " % N_iterations)
+    print("\n\nGenerating %s bp window averages across %s iterations for plotting: " % (rc_wind, N_iterations))
     print("Generation: ", end = " ")
     
-    for gen in generations:
-        if int(gen) % 1000 == 0:
+    for gen in generations: ## only using gens present in all iterations included. 
+        if int(gen) % rc_wind == 0:
             print(" %s," % gen, end = " ")
 
-        gen_data = per_gen_per_base_all_sim_avgs[gen]
-        
         WIND_STRT = 0
         WIND_STOP = rc_wind-1
 
         WIND_averaged_vector = []
 
         for i in range(len(windows)):
-#            if len(gen_data[WIND_STRT:WIND_STOP]) < 1:
-#                print("Window: %s - %s has no data" % (WIND_STRT, WIND_STOP))
-            WIND_averaged_vector.append(np.mean(gen_data[WIND_STRT:WIND_STOP]))
+            if len(per_gen_per_base_all_sim_avgs[gen][WIND_STRT:WIND_STOP]) < 1:
+                print("Window: %s - %s has no data" % (WIND_STRT, WIND_STOP))
+            WIND_averaged_vector.append(np.mean(per_gen_per_base_all_sim_avgs[gen][WIND_STRT:WIND_STOP]))
             WIND_STRT += rc_wind
             WIND_STOP += rc_wind
 
         colorVal = scalarMap.to_rgba(generations[colour_index])
-
-
+ 
         if gen == 0:
-            ax1.plot(np.log(WIND_averaged_vector), color="grey", dashes = [5, 10], label = gen) ## plot starting prob as dashed line
+            #ax1.plot(np.log(WIND_averaged_vector), color="grey", dashes = [5, 10], label = gen) ## plot starting prob as dashed line
+            pass
         else:
-            ax1.plot(np.log(WIND_averaged_vector), color=colorVal, label = gen )
+            ax1.plot(WIND_averaged_vector, color=colorVal, label = gen )
+#            ax1.plot(np.log(WIND_averaged_vector), color=colorVal, label = gen )
         colour_index += 1
 
         ## track highest value for mannually setting the ylim on plots later.
@@ -491,17 +522,22 @@ def Recomb_prob_all_iterations(pergen_perbase_avgs_filepaths, rv_identifier = "A
     ax1.patch.set_visible(False)
 
     ## sample tick labels for the x axis
-    xtick_sampler = int(np.round(len(positions)/int(len(windows)/2)))
-    print(xtick_sampler)
-    ax1.set_xticks(range(0,len(windows), 2))
-    ax1.set_xticklabels([i-1 for i in positions][::xtick_sampler],rotation = 30)
+    #xtick_sampler = int(np.round(len(windows)/tick_sampler))
+    #print(xtick_sampler)
+    #ax1.set_xticks(range(0,len(windows), xtick_sampler))
+    #ax1.set_xticklabels([i-1 for i in windows][::xtick_sampler],rotation = 30)
 
+    ## sample tick labels for the x axis
+    xtick_sampler = int(np.round(len(positions)/int(len(windows)/20)))
+    print(xtick_sampler)
+    ax1.set_xticks(range(0,len(windows), 20))
+    ax1.set_xticklabels([i-1 for i in positions][::xtick_sampler],rotation = 30)
 
     ## set the ylim so all plots start from 0
     #ax1.set_ylim(0,(plot_max+(plot_max/10)))
 
     ## add axis labels
-    ax1.set_ylabel("%s (averaged over %s iterations)" % ("Log Recombination probabilties", N_iterations))
+    ax1.set_ylabel("%s (averaged over %s iterations)" % ("Recombination probabilties", N_iterations))
     ax1.set_xlabel("Postition")
 
     ## inset the axis for the colorbar legend and format it
@@ -546,14 +582,22 @@ def NRR_lengths_per_it(pergen_perbase_avgs_outpath, SD = 50000):
             gen = int(line.split("\t")[0])
             vector = np.asarray([float(i) for i in line.split("\t")[1].split()])
         
-            left = vector[0:SD]
+            left = vector[0:SD][::-1]
             right = vector[(SD+1):]
+            
+            Left_limit = 0
+            base_prob = left[Left_limit]
+            while base_prob == 0 and Left_limit < 49999:
+                base_prob = left[Left_limit]
+                Left_limit += 1
 
-            Left_limit = (left[::-1]>0.0000000001).argmax()
-            Right_limit = (right>0.0000000001).argmax()
+            Right_limit = 0
+            base_prob = right[Right_limit]
+            while base_prob == 0 and Right_limit < 49999:
+                base_prob = right[Right_limit]
+                Right_limit += 1
 
             NRR_length = Left_limit + Right_limit
-
             NRR_lengths[gen] = NRR_length
             
     print("   File: %s done" % pergen_perbase_avgs_outpath)
@@ -587,8 +631,9 @@ def Get_last_NRR_avg(NRR_per_it):
         sys.exit("\nSTOPPED: Not all iterations end at the same generation!")
     elif len(set(last_iterations)) == 1:
         average_NRR_size_at_last_gen = np.mean(last_NRR_per_it)
+        std_NRR_size_at_last_gen = np.std(last_NRR_per_it)
 
-    return average_NRR_size_at_last_gen
+    return average_NRR_size_at_last_gen, std_NRR_size_at_last_gen
 
 
 
@@ -612,6 +657,14 @@ def Plot_NRR_size_per_simulation(NRR_per_it, outpath, xtick_sampler = 20):
         
     means = np.mean(all_it_vectors, axis = 0)
     stds = np.std(all_it_vectors, axis = 0)
+
+    ## write the NRR size and STD averaged across iterations to a file
+    NRR_summary_out = outpath.rpartition("/")[0]
+    with open("%s/Avg_NRR_size_per_gen.out" % NRR_summary_out, 'w') as Avg_NRRs_out:
+        gen_index = 0
+        for gen in sorted(NRR_per_it[iteration].keys()):  ## using the last iteration processed to get the list of gens to loop over (all iterations have the same gens at this point)
+            Avg_NRRs_out.write("%s\t%s\t%s\n" % (gen, means[gen_index], stds[gen_index]))
+            gen_index += 1
 
     y_low = means-stds
     y_high= means+stds
@@ -651,7 +704,7 @@ def Plot_NRR_size_per_simulation(NRR_per_it, outpath, xtick_sampler = 20):
 ###############################################################################################################################################################################################
 
 
-def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True, plot_iterations = False, N_threads = 1, Gnome_size = 100000, N_gams = 100, RC_WIND = 1000, xtick_sampler = 20):
+def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True, plot_iterations = False, N_threads = 1, Gnome_size = 100000, N_gams = 100, RC_WIND = 100, xtick_sampler = 20, hotspot = False):
 
     """
     
@@ -674,6 +727,7 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
     """
 
     import os
+    import sys
     import random
     import numpy as np
     import multiprocessing as mp
@@ -768,8 +822,8 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
     
             rv_paths_to_run = ["%s/%s" % (wd, file) for file in per_base_avg_files_to_run]
     
-            pool.map(rv_to_perbase_avg, rv_paths_to_run)
-    
+            pool.starmap(rv_to_perbase_avg, [(rv_path, N_gams, hotspot) for rv_path in rv_paths_to_run])
+ 
     
         elif N_threads == 1:
     
@@ -787,19 +841,23 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
     
                 ## Step 1. Convert recomb probabilities from block-wise to per base vectors
                 
-                rv_to_perbase_avg(filepath)
+                rv_to_perbase_avg(filepath, N_gams, hotspot)
 
 
     ## get the final list of the AVGS files now present in wd.
+    
+    rv_avgs_filepaths = []    
  
-    rv_avgs_filepaths = ["%s/%s_AVGS.out" % (wd, rv_file.rpartition(".")[0]) for rv_file in rv_files_to_run]
+    for file in os.listdir(wd):
+        if "AVGS" in file and "%s.out" % file.split("_AVGS")[0] in rv_files_to_run:
+            rv_avgs_filepaths.append("%s/%s" % (wd, file))
 
 
     ## Step 2. Get NRR lenghts for each iteration
     
     ## check that NRR lengths not already calculated for each iteration
 
-    print("\nGetting NRR lengths for %s iterations (N threads =  %s)" % (len(rv_files_to_run), N_threads))
+    print("\nGetting NRR lengths for %s iterations (N threads =  %s)" % (len(rv_avgs_filepaths), N_threads))
 
     NRR_files_to_run = []
     NRR_per_it_unreduced = {}
@@ -882,7 +940,10 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
     for gen in gen_count:
         if gen_count[gen] == len(NRR_per_it_unreduced):
             generations_to_keep.append(gen)
-    max_gen_to_keep = max(generations_to_keep)
+    if len(generations_to_keep) == 0:
+        sys.exit("No generation completed in all iterations")    
+    else:
+        max_gen_to_keep = max(generations_to_keep)
 
     NRR_per_it = {}
 
@@ -916,7 +977,7 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
     if plot == True:
 
         ## Step 4. Plot
-        print("\nPlotting recombination probabilties by window across all simualtions")
+        print("\nPlotting recombination probabilties by generation across all simualtions")
 
         Recomb_prob_all_iterations(rv_avgs_filepaths, genome_size = Gnome_size, rc_wind = RC_WIND, tick_sampler = xtick_sampler)
 
@@ -930,9 +991,9 @@ def Recomb_plotter_mem(wd, num_iterations = 0, run_iterations = [], plot = True,
 
     ## Step 6. Get the final average NRR length across all iterations for this simulation.
 
-    Final_NRR_size = Get_last_NRR_avg(NRR_per_it)
+    Final_NRR_size, STD_NRR_size = Get_last_NRR_avg(NRR_per_it)
 
-    print("Average final size of non-recombining region (generation %s) = %s kb" % (max_gen_to_keep, np.round((Final_NRR_size/1000), 2)))
+    print("Average final size of non-recombining region (generation %s) = %s kb, St.dev = %s" % (max_gen_to_keep, np.round((Final_NRR_size/1000),2), np.round((STD_NRR_size/1000), 2)))
 
     #return Final_NRR_size
 
@@ -978,17 +1039,35 @@ def Stat_plotter(logfile_dir, Stat_to_plot, verbose = False):
             logfiles.append("%s/%s" % (logfile_dir, logfile))
 
     ## Get the number of generations
-    # Mathias modified: if some runs are incomplete for the number of generations, find the largest generation that was achieved in any of the runs (files)
-    generations = []
+    ## New behaviour - only keep generations where all iterations finished! 
+
+    generation_dict = {}
     for f in logfiles:
         if verbose == True:
             print(f)
         with open(f, "r") as F:
             for line in F:
                 if not any(["site" in line, "generation" in line]):
-                    generations.append(int(line.split()[0]))
-    g = sorted(list(set(generations)), key = int)
-    generations = g
+                    if int(line.split()[0]) not in generation_dict:
+                        generation_dict[int(line.split()[0])] = []
+                    generation_dict[int(line.split()[0])].append(f)
+
+
+    generations = []
+    for gen in sorted(generation_dict.keys()):
+        if len(generation_dict[gen]) == len(logfiles):
+            generations.append(gen)
+        else:
+            missing_iterations = []
+            for iteration in logfiles:
+                if iteration not in generation_dict[gen]: 
+                    missing_iterations.append(iteration)
+            print("Generation %s not completed for iterations %s" % (gen, ", ".join(sorted([i.rpartition("/")[2] for i in missing_iterations]))))
+    
+
+
+
+    generations = sorted(generations, key = int)
 
     ## Get the windows
 
@@ -1015,17 +1094,21 @@ def Stat_plotter(logfile_dir, Stat_to_plot, verbose = False):
         for line in open(logfile, 'r').readlines():
             if not any(["site" in line, "generation" in line]):
                 generation = int(line.split()[0])
-                data_fields = line.split()[2:]
-                field_index = 0
+                if generation in generations:
+
+                    data_fields = line.split()[2:]
+                    field_index = 0
 
 
-                for field in data_fields:
-                    window = windows[field_index]
-                    if field == "NA":
-                        Raw_data_by_gen[generation][window].append(np.nan)
-                    else:
-                        Raw_data_by_gen[generation][window].append(float(field))
-                    field_index += 1
+                    for field in data_fields:
+                        window = windows[field_index]
+                        if field == "NA":
+                            Raw_data_by_gen[generation][window].append(np.nan)
+                        else:
+                            Raw_data_by_gen[generation][window].append(float(field))
+                        field_index += 1
+                else:
+                    pass
 
 
 
@@ -1211,8 +1294,9 @@ def sex_chrom_sim_plotter(Multi_sim_dir = None,
                           NRR_N_threads = 1,
                           NRR_Gnome_size = 100000,
                           NRR_N_gams = 100,
-                          NRR_RC_WIND = 1000,
-                          NRR_xtick_sampler = 20):
+                          NRR_RC_WIND = 100,
+                          NRR_xtick_sampler = 20,
+                          NRR_hotspot = False):
 
     """
     Wrapper for all sex chromosome simulation plots.
@@ -1256,7 +1340,7 @@ def sex_chrom_sim_plotter(Multi_sim_dir = None,
 
 
     """
-
+    
     import os
     import sys
 
@@ -1279,9 +1363,11 @@ def sex_chrom_sim_plotter(Multi_sim_dir = None,
                                        run_iterations = NRR_run_iterations,
                                        plot_iterations = NRR_plot_iterations,
                                        Gnome_size = NRR_Gnome_size,
+                                       N_gams = NRR_N_gams,
                                        N_threads = NRR_N_threads,
                                        RC_WIND = NRR_RC_WIND,
-                                       xtick_sampler = NRR_xtick_sampler)
+                                       xtick_sampler = NRR_xtick_sampler,
+                                       hotspot = NRR_hotspot)
 
 
 
@@ -1356,6 +1442,7 @@ def sex_chrom_sim_plotter(Multi_sim_dir = None,
                                                                plot_iterations = NRR_plot_iterations,
                                                                N_threads = NRR_N_threads,
                                                                Gnome_size = NRR_Gnome_size,
+                                                               N_gams = NRR_N_gams,
                                                                RC_WIND = NRR_RC_WIND,
                                                                xtick_sampler = NRR_xtick_sampler)
 
